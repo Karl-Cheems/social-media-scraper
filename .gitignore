@@ -1,0 +1,8 @@
+_gui_*.json
+社交监控工具.exe
+*.exe
+__pycache__/
+*.pyc
+.claude/skills/lark-shared/lark-cli.exe
+.claude/skills/lark-shared/qr_login.png
+.env
