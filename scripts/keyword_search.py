@@ -439,41 +439,42 @@ async def _search_xiaohongshu(page, keyword: str, per_keyword: int) -> list[dict
         await page.evaluate("document.querySelector('.filter').click()")
         await page.wait_for_timeout(2000)
 
-        # 点击"最多点赞"
-        most_likes = await page.evaluate("""
-            () => {
-                var tags = document.querySelectorAll('.filter-panel .tags');
-                for (var t of tags) {
-                    if ((t.textContent || '').trim() === '最多点赞') {
-                        t.click(); return true;
-                    }
-                }
-                return false;
-            }
-        """)
-        print(f"    点击最多点赞: {most_likes}", file=sys.stderr)
+        # 用 Playwright locator 带 force:true 点击"最多点赞"
+        try:
+            panel = page.locator(".filter-panel")
+            tags = panel.locator(".tags[data-hp-bound]")  # 只点可见的
+            count = await tags.count()
+            for i in range(count):
+                text = (await tags.nth(i).inner_text()).strip()
+                if text == "最多点赞":
+                    await tags.nth(i).click(force=True, timeout=5000)
+                    print(f"    点击: 最多点赞", file=sys.stderr)
+                    break
+        except Exception as e:
+            print(f"    点击最多点赞失败: {e}", file=sys.stderr)
+
         await page.wait_for_timeout(1000)
 
         # 点击"一周内"
-        week = await page.evaluate("""
-            () => {
-                var tags = document.querySelectorAll('.filter-panel .tags');
-                for (var t of tags) {
-                    if ((t.textContent || '').trim() === '一周内') {
-                        t.click(); return true;
-                    }
-                }
-                return false;
-            }
-        """)
-        print(f"    点击一周内: {week}", file=sys.stderr)
+        try:
+            tags = panel.locator(".tags[data-hp-bound]")
+            count = await tags.count()
+            for i in range(count):
+                text = (await tags.nth(i).inner_text()).strip()
+                if text == "一周内":
+                    await tags.nth(i).click(force=True, timeout=5000)
+                    print(f"    点击: 一周内", file=sys.stderr)
+                    break
+        except Exception as e:
+            print(f"    点击一周内失败: {e}", file=sys.stderr)
+
         await page.wait_for_timeout(1500)
 
         # 关闭筛选面板
         await page.evaluate("document.querySelector('.filter').click()")
         await page.wait_for_timeout(1500)
 
-        print(f"    筛选: 最多点赞 + 一周内", file=sys.stderr)
+        print(f"    筛选完成: 最多点赞 + 一周内", file=sys.stderr)
     except Exception as e:
         print(f"    筛选设置失败: {e}", file=sys.stderr)
 
