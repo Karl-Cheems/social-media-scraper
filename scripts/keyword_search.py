@@ -437,10 +437,10 @@ async def _search_xiaohongshu(page, keyword: str, per_keyword: int) -> list[dict
     # 打开筛选面板，设置：最多点赞 + 一周内
     try:
         await page.evaluate("document.querySelector('.filter').click()")
-        await page.wait_for_timeout(1500)
+        await page.wait_for_timeout(2000)
 
         # 点击"最多点赞"
-        await page.evaluate("""
+        most_likes = await page.evaluate("""
             () => {
                 var tags = document.querySelectorAll('.filter-panel .tags');
                 for (var t of tags) {
@@ -451,10 +451,11 @@ async def _search_xiaohongshu(page, keyword: str, per_keyword: int) -> list[dict
                 return false;
             }
         """)
-        await page.wait_for_timeout(800)
+        print(f"    点击最多点赞: {most_likes}", file=sys.stderr)
+        await page.wait_for_timeout(1000)
 
         # 点击"一周内"
-        await page.evaluate("""
+        week = await page.evaluate("""
             () => {
                 var tags = document.querySelectorAll('.filter-panel .tags');
                 for (var t of tags) {
@@ -465,6 +466,7 @@ async def _search_xiaohongshu(page, keyword: str, per_keyword: int) -> list[dict
                 return false;
             }
         """)
+        print(f"    点击一周内: {week}", file=sys.stderr)
         await page.wait_for_timeout(1500)
 
         # 关闭筛选面板
