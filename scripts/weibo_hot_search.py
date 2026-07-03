@@ -194,60 +194,25 @@ async def scrape_hot_search(
 async def _fetch_topic_detail(
     page, item: dict, board: str = "hot",
 ) -> TopicDetail | None:
-    """进入热搜话题搜索页，找到智搜回答并采集其内容。"""
+    """直接构造 aisearch URL 获取智搜回答。"""
     title = item.get("title", "")
     rank = item.get("rank", 0)
     hot = item.get("hot", "")
     topic_url = item.get("url", "")
 
-    # 统一导向热门排序的搜索页
-    if topic_url and "xsort=hot" not in topic_url:
-        q_match = re.search(r'[?&]q=([^&]+)', topic_url)
-        if q_match:
-            topic_url = f"https://s.weibo.com/weibo?q={q_match.group(1)}&xsort=hot"
-        else:
-            topic_url = f"https://s.weibo.com/weibo?q={title}&xsort=hot"
-    elif not topic_url:
-        topic_url = f"https://s.weibo.com/weibo?q={title}&xsort=hot"
-
-    await page.goto(topic_url, wait_until="domcontentloaded", timeout=30000)
-    await page.wait_for_timeout(3000)
-
-    # 滚动加载更多结果
-    for _ in range(3):
-        await page.evaluate("window.scrollBy(0, 1200)")
-        await page.wait_for_timeout(1000)
-
-    # 在 card-wrap 列表中找智搜回答
-    zhishou_url = await page.evaluate("""
-        () => {
-            var wraps = document.querySelectorAll('.card-wrap');
-            for (var w of wraps) {
-                var txt = (w.textContent || '');
-                var nameEl = w.querySelector('.name, [class*=name], [nick-name]');
-                var name = nameEl ? (nameEl.textContent || '').trim() : '';
-                if (name.indexOf('智搜') >= 0 || txt.indexOf('智搜回答') >= 0) {
-                    var timeLink = w.querySelector('.from a');
-                    if (timeLink) {
-                        var href = timeLink.getAttribute('href') || '';
-                        if (href.startsWith('//')) href = 'https:' + href;
-                        if (href.indexOf('weibo.com') >= 0 || href.indexOf('aisearch') >= 0) return href;
-                    }
-                }
-            }
-            return '';
-        }
-    """)
+    # 直接构造 aisearch URL
+    aisearch_url = f"https://s.weibo.com/aisearch?q={title}&Refer=weibo_aisearch"
 
     zhishou_answer = None
-    if zhishou_url:
-        print(f"    找到智搜回答", file=sys.stderr)
-        try:
-            zhishou_answer = await _fetch_zhishou_detail(page, zhishou_url)
-        except Exception as e:
-            print(f"    智搜详情页采集失败: {e}", file=sys.stderr)
-    else:
-        print(f"    未找到智搜回答", file=sys.stderr)
+    try:
+        zhishou_answer = await _fetch_zhishou_detail(page, aisearch_url)
+        if zhishou_answer and zhishou_answer.text:
+            print(f"    ✅ 智搜回答 {len(zhishou_answer.text)} 字符", file=sys.stderr)
+        else:
+            print(f"    智搜回答为空", file=sys.stderr)
+            zhishou_answer = None
+    except Exception as e:
+        print(f"    智搜回答采集失败: {e}", file=sys.stderr)
 
     return TopicDetail(
         rank=rank,
@@ -259,23 +224,49 @@ async def _fetch_topic_detail(
     )
 
 
-async def _fetch_zhishou_detail(page, zhishou_url: str) -> ZhishouAnswer:
+async def _fetch_zhishou_detail(page, aisearch_url: str) -> ZhishouAnswer | None:
     """进入 aisearch 页面，提取智搜回答正文，尝试展开查看更多。"""
-    await page.goto(zhishou_url, wait_until="domcontentloaded", timeout=30000)
+    await page.goto(aisearch_url, wait_until="domcontentloaded", timeout=30000)
     await page.wait_for_timeout(3000)
 
-    # 提取回答正文
+    # 提取回答正文：跳过导航和榜单，取主要内容区域
     text = await page.evaluate("""
         () => {
-            var candidates = document.querySelectorAll(
-                '.detail, .content, .text, [class*=answer], [class*=result], [class*=content]'
-            );
-            var best = '';
-            for (var el of candidates) {
-                var t = (el.textContent || '').trim();
-                if (t.length > best.length) best = t;
+            var all = document.body.innerText || '';
+            var lines = all.split(String.fromCharCode(10));
+            var skip = new Set(['NEW', '综合', '用户', '实时', '视频', '图片', '关注', '超话',
+                '高级搜索', '搜索结果', '更多', '刷新', '我的', '微博热搜', '热搜榜', '文娱榜',
+                '首页', '推荐', '话题']);
+            var clean = [];
+            var inAnswer = false;
+
+            for (var i = 0; i < lines.length; i++) {
+                var l = lines[i].trim();
+                if (!l) continue;
+
+                // 找到"回答"或"深度思考"标记开始采集
+                if (l === '回答' || l === '深度思考') {
+                    inAnswer = true;
+                    continue;
+                }
+                // 遇到信源/风险提示时停止
+                if (l.indexOf('信源追溯') >= 0 || l.indexOf('风险提示') >= 0) break;
+                // 跳过单行导航词
+                if (skip.has(l)) continue;
+                if (inAnswer && l.length > 3) clean.push(l);
             }
-            return best;
+
+            // 如果没找到"回答"标记，兜底取所有大段文字
+            if (clean.length < 3) {
+                clean = [];
+                for (var i = 0; i < lines.length; i++) {
+                    var l = lines[i].trim();
+                    if (!l || skip.has(l)) continue;
+                    if (l.length > 30) clean.push(l);
+                }
+            }
+
+            return clean.join(String.fromCharCode(10));
         }
     """)
 
@@ -298,15 +289,14 @@ async def _fetch_zhishou_detail(page, zhishou_url: str) -> ZhishouAnswer:
             await page.wait_for_timeout(2000)
             expanded = await page.evaluate("""
                 () => {
-                    var candidates = document.querySelectorAll(
-                        '.detail, .content, .text, [class*=answer], [class*=result], [class*=content]'
-                    );
-                    var best = '';
-                    for (var el of candidates) {
-                        var t = (el.textContent || '').trim();
-                        if (t.length > best.length) best = t;
+                    var all = document.body.innerText || '';
+                    var lines = all.split(String.fromCharCode(10));
+                    var clean = [];
+                    for (var i = 0; i < lines.length; i++) {
+                        var l = lines[i].trim();
+                        if (l && l.length > 10) clean.push(l);
                     }
-                    return best;
+                    return clean.join(String.fromCharCode(10));
                 }
             """)
             if expanded == text:
@@ -314,10 +304,13 @@ async def _fetch_zhishou_detail(page, zhishou_url: str) -> ZhishouAnswer:
     except Exception:
         pass
 
+    if not text:
+        return None
+
     return ZhishouAnswer(
         text=text[:5000],
         expanded=expanded[:5000] if expanded else "",
-        source_url=zhishou_url,
+        source_url=aisearch_url,
     )
 
 
