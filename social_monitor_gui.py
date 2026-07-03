@@ -320,7 +320,7 @@ class SocialMonitorGUI:
                                               state="readonly", width=14)
         self.kw_product_combo.pack(side="left", padx=(0, 8))
         self.kw_product_combo.bind("<<ComboboxSelected>>", self._on_product_change)
-        self.kw_select_all_btn = ttk.Button(r1, text="全选关键词", style="Outline.TButton",
+        self.kw_select_all_btn = ttk.Button(r1, text="取消全选", style="Outline.TButton",
                                             command=self._toggle_all_kw, width=12)
         self.kw_select_all_btn.pack(side="right", padx=(4, 0))
 
