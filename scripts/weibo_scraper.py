@@ -17,12 +17,7 @@ import sys
 from pydantic import BaseModel, Field
 from playwright.async_api import async_playwright
 
-
-class CommentItem(BaseModel):
-    """单条评论"""
-    user: str = Field(description="评论用户")
-    content: str = Field(description="评论内容")
-    likes: int = Field(description="评论点赞数")
+from common import CommentItem, kill_edge, launch_browser, get_edge_user_data, write_output, random_delay, normalize_time, wait_for_login
 
 
 class WeiboEngagement(BaseModel):
@@ -31,6 +26,7 @@ class WeiboEngagement(BaseModel):
     reposts: int = Field(description="转发数")
     comments: int = Field(description="评论数")
     likes: int = Field(description="点赞数")
+    published_at: str = Field(default="", description="发布时间（如 2小时前、06-28）")
     comments_list: list[CommentItem] = Field(default_factory=list, description="评论列表")
     url: str = Field(description="微博链接")
 
@@ -46,68 +42,6 @@ class ProfileResult(BaseModel):
 DEFAULT_PROFILE_URL = "https://weibo.com/5822662089?refer_flag=1001030103_"
 
 
-def _kill_edge():
-    """关闭正在运行的 Edge 进程（User Data 被占用时 Playwright 无法启动）。"""
-    import subprocess
-    try:
-        result = subprocess.run(
-            ["tasklist", "/fi", "imagename eq msedge.exe", "/nh"],
-            capture_output=True, text=True, timeout=10
-        )
-        if "msedge.exe" in result.stdout:
-            print("检测到 Edge 正在运行，正在关闭...", file=sys.stderr)
-            subprocess.run(["taskkill", "/f", "/im", "msedge.exe"],
-                           capture_output=True, timeout=10)
-            print("Edge 已关闭", file=sys.stderr)
-    except Exception:
-        pass
-
-
-async def _launch_browser(p, headless: bool, user_data_dir: str, **kwargs):
-    """安全启动 Edge，如遇 User Data 被占用则自动杀进程重试。
-
-    Returns: (context, page) 或抛出异常。
-    """
-    import tempfile
-    from playwright._impl._errors import TargetClosedError
-
-    for attempt in range(2):
-        try:
-            context = await p.chromium.launch_persistent_context(
-                user_data_dir=user_data_dir,
-                channel="msedge",
-                headless=headless,
-                args=["--disable-sync"],
-                viewport={"width": 1920, "height": 1080},
-                **kwargs,
-            )
-            page = await context.new_page()
-            return context, page
-        except TargetClosedError:
-            print(f"  Edge 启动失败（attempt {attempt+1}），正在关闭已有 Edge 进程...", file=sys.stderr)
-            _kill_edge()
-            await asyncio.sleep(2)
-
-    # 最后一次尝试：用临时目录启动（需要用户手动登录）
-    print("  使用临时用户目录启动 Edge（将弹出登录窗口）...", file=sys.stderr)
-    temp_dir = tempfile.mkdtemp(prefix="weibo_scraper_")
-    try:
-        context = await p.chromium.launch_persistent_context(
-            user_data_dir=temp_dir,
-            channel="msedge",
-            headless=False,  # 临时目录无登录态，必须非无头
-            args=["--disable-sync"],
-            viewport={"width": 1920, "height": 1080},
-        )
-        page = await context.new_page()
-        print("  请在浏览器窗口中扫码/密码登录微博账号", file=sys.stderr)
-        return context, page
-    except Exception:
-        import shutil
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        raise
-
-
 async def scrape_profile(
     profile_url: str = DEFAULT_PROFILE_URL,
     limit: int = 10,
@@ -118,17 +52,15 @@ async def scrape_profile(
     """打开微博账号主页，采集该账号发布的微博数据。"""
     weibos = []
     author_name = ""
-    edge_user_data = os.path.join(
-        os.environ.get("LOCALAPPDATA", ""), "Microsoft", "Edge", "User Data"
-    )
+    edge_user_data = get_edge_user_data()
 
     async with async_playwright() as p:
-        context, page = await _launch_browser(p, headless=headless, user_data_dir=edge_user_data)
+        context, page = await launch_browser(p, headless=headless, user_data_dir=edge_user_data, label="weibo_scraper")
 
         try:
             print(f"正在打开用户主页: {profile_url}", file=sys.stderr)
             await page.goto(profile_url, wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(8000)
+            await page.wait_for_timeout(3000)
 
             # 检测是否登录
             current_url = page.url
@@ -136,15 +68,17 @@ async def scrape_profile(
                 "login" in current_url or "passport" in current_url
                 or "微博" not in await page.title()
             )
-            if login_detected and headless:
-                print("\n⚠️ 检测到未登录状态，将打开浏览器窗口供您登录...", file=sys.stderr)
-                print("请在浏览器窗口中完成登录后，等待脚本自动继续\n", file=sys.stderr)
-                await context.close()
-                context, page = await _launch_browser(
-                    p, headless=False, user_data_dir=edge_user_data
-                )
-                await page.goto(profile_url, wait_until="domcontentloaded", timeout=30000)
-                await page.wait_for_timeout(12000)
+            if login_detected:
+                if headless:
+                    print("\n⚠️ 检测到未登录状态，将打开浏览器窗口供您登录...", file=sys.stderr)
+                    print("请在浏览器窗口中完成登录后，等待脚本自动继续\n", file=sys.stderr)
+                    await context.close()
+                    context, page = await launch_browser(
+                        p, headless=False, user_data_dir=edge_user_data, label="weibo_scraper"
+                    )
+                    await page.goto(profile_url, wait_until="domcontentloaded", timeout=30000)
+                    await page.wait_for_timeout(5000)
+                await wait_for_login(page)
 
             # 获取账号名称
             author_name = await page.evaluate(
@@ -162,7 +96,7 @@ async def scrape_profile(
             scroll_rounds = 0
             while len(weibo_data) < limit and scroll_rounds < 30:
                 await page.evaluate("window.scrollBy(0, 1200)")
-                await page.wait_for_timeout(2000)
+                await page.wait_for_timeout(1000)
 
                 batch = await page.evaluate(
                     """() => {
@@ -182,29 +116,49 @@ async def scrape_profile(
                                 if (href.includes('weibo.com')) detailUrl = href;
                             }
 
-                            var footer = a.querySelector('footer');
-                            var reposts = -1, comments = -1, likes = -1;
-                            if (footer) {
-                                var numEls = footer.querySelectorAll('[class*=_num_]');
-                                for (var j = 0; j < numEls.length; j++) {
-                                    var t = numEls[j].textContent.trim();
-                                    if (!t) continue;
-                                    if (t === '转发') { reposts = 0; continue; }
-                                    if (t === '评论' || t === '赞') continue;
-                                    var n = parseInt(t.replace(/,/g, ''), 10);
-                                    if (isNaN(n) || n < 0) continue;
-                                    if (j === 0) reposts = n;
-                                    else if (j === 1) comments = n;
-                                }
-                                var likeEl = footer.querySelector('[class*=woo-like-count]');
-                                if (likeEl) {
-                                    var lt = likeEl.textContent.trim();
-                                    if (lt) { var ln = parseInt(lt.replace(/,/g, ''), 10); if (!isNaN(ln)) likes = ln; }
-                                }
+                            var isPinned = (a.textContent || '').indexOf('置顶') >= 0;
+
+                            var pubTime = '';
+                            if (timeLink) {
+                                pubTime = (timeLink.textContent || '').trim();
+                            }
+                            if (!pubTime) {
+                                var timeEl = a.querySelector('time, [datetime], [class*=_time_]');
+                                if (timeEl) pubTime = (timeEl.textContent || timeEl.getAttribute('datetime') || '').trim();
                             }
 
+                            var footer = a.querySelector('footer');
+                            var reposts = -1, comments = -1, likes = -1;
+                            (function() {
+                                if (footer) {
+                                    var numEls = footer.querySelectorAll('[class*=_num_]');
+                                    for (var j = 0; j < numEls.length; j++) {
+                                        var t = numEls[j].textContent.trim();
+                                        if (!t) continue;
+                                        if (t === '转发') { reposts = 0; continue; }
+                                        if (t === '评论' || t === '赞') continue;
+                                        var n = parseInt(t.replace(/,/g, ''), 10);
+                                        if (isNaN(n) || n < 0) continue;
+                                        if (reposts < 0) reposts = n;
+                                        else if (comments < 0) comments = n;
+                                    }
+                                    var likeEl = footer.querySelector('[class*=woo-like-count]');
+                                    if (likeEl) {
+                                        var lt = likeEl.textContent.trim();
+                                        if (lt) { var ln = parseInt(lt.replace(/,/g, ''), 10); if (!isNaN(ln)) likes = ln; }
+                                    }
+                                }
+                                if (reposts < 0 || comments < 0 || likes < 0) {
+                                    var all = a.textContent;
+                                    var m;
+                                if (reposts < 0) { m = all.match(/转发[\\s\\S]{0,3}([\\d,]*)/); if (m) reposts = parseInt(m[1].replace(/,/g,''), 10); }
+                                    if (comments < 0) { m = all.match(/评论[\\s\\S]{0,3}([\\d,]*)/); if (m) comments = parseInt(m[1].replace(/,/g,''), 10); }
+                                    if (likes < 0) { m = all.match(/赞[\\s\\S]{0,3}([\\d,]*)/); if (m) likes = parseInt(m[1].replace(/,/g,''), 10); }
+                                }
+                            })();
+
                             if (text.length > 10) {
-                                r.push({ text: text, reposts: reposts, comments: comments, likes: likes, url: detailUrl });
+                                r.push({ text: text, reposts: reposts, comments: comments, likes: likes, url: detailUrl, pinned: isPinned, pubTime: pubTime });
                             }
                         }
                         return r;
@@ -227,13 +181,19 @@ async def scrape_profile(
 
                 print(f"  滚动中... 累计 {len(weibo_data)} 条微博", file=sys.stderr)
 
-            # 取最新的 limit 条（保持 DOM 顺序，最上面最新）
-            weibo_data = weibo_data[:limit]
-            print(f"取前 {len(weibo_data)} 条最新微博", file=sys.stderr)
+            # 过滤置顶，取最新的 limit 条
+            pinned_count = sum(1 for w in weibo_data if w.get("pinned"))
+            weibo_data = [w for w in weibo_data if not w.get("pinned")][:limit]
+            if pinned_count:
+                print(f"跳过 {pinned_count} 条置顶，取前 {len(weibo_data)} 条最新微博", file=sys.stderr)
+            else:
+                print(f"取前 {len(weibo_data)} 条最新微博", file=sys.stderr)
 
-            # 第二阶段：进入详情页获取完整正文（详情页不被截断），如有需要同时取评论
+            # 第二阶段：用点击方式进入详情页获取完整正文和评论
             print(f"\n进入详情页获取完整正文...", file=sys.stderr)
             for idx, item in enumerate(weibo_data):
+                if idx > 0:
+                    await random_delay(1, 3, "微博详情页间隔")
                 text_short = (item.get("text", "") or "")[:30]
                 reposts = item.get("reposts", -1)
                 comment_count = item.get("comments", -1)
@@ -245,13 +205,40 @@ async def scrape_profile(
 
                 if detail_url:
                     try:
-                        await page.goto(detail_url, wait_until="domcontentloaded", timeout=30000)
-                        await page.wait_for_timeout(4000)
+                        # 在账号主页找到对应的 article 并点击时间链接（SPA 内部导航）
+                        clicked = await page.evaluate("""
+                        (targetUrl) => {
+                            var arts = document.querySelectorAll('article');
+                            for (var a of arts) {
+                                var timeLink = a.querySelector('[class*=_time_]');
+                                if (!timeLink) continue;
+                                var href = timeLink.getAttribute('href') || '';
+                                if (!href.startsWith('http')) href = 'https:' + href;
+                                if (href === targetUrl || href.split('?')[0] === targetUrl.split('?')[0]) {
+                                    var evt = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+                                    timeLink.dispatchEvent(evt);
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }
+                        """, detail_url)
+
+                        if not clicked:
+                            print(f"  未找到可点击的卡片，回退到 goto", file=sys.stderr)
+                            await page.goto(detail_url, wait_until="domcontentloaded", timeout=30000)
+                            await page.wait_for_timeout(2000)
+                        else:
+                            # 等待 SPA 导航到详情页
+                            try:
+                                await page.wait_for_url("**/detail/**", timeout=10000)
+                            except Exception:
+                                pass
+                            await page.wait_for_timeout(2000)
 
                         # 从详情页提取完整正文
                         full_text = await page.evaluate("""
                             () => {
-                                // 找所有包含正文文本的元素，选最长的那个（跳过短文本/导航按钮）
                                 var candidates = document.querySelectorAll(
                                     '[class*=_ogText_], [class*=_text_], [class*=_wbtext_]'
                                 );
@@ -264,11 +251,30 @@ async def scrape_profile(
                             }
                         """)
 
+                        # 在详情页重新提取互动数据（比列表页更准确）
+                        detail_nums = await page.evaluate("""
+                            () => {
+                                var all = document.body.innerText || '';
+                                var r = { reposts: -1, comments: -1, likes: -1 };
+                                var m;
+                                m = all.match(/转发[\\s\\S]{0,3}([\\d,]*)/); if (m) r.reposts = parseInt(m[1].replace(/,/g,''), 10);
+                                m = all.match(/评论[\\s\\S]{0,3}([\\d,]*)/); if (m) r.comments = parseInt(m[1].replace(/,/g,''), 10);
+                                m = all.match(/赞[\\s\\S]{0,3}([\\d,]*)/); if (m) r.likes = parseInt(m[1].replace(/,/g,''), 10);
+                                return r;
+                            }
+                        """)
+                        if detail_nums.get("reposts", -1) >= 0:
+                            reposts = detail_nums["reposts"]
+                        if detail_nums.get("comments", -1) >= 0:
+                            comment_count = detail_nums["comments"]
+                        if detail_nums.get("likes", -1) >= 0:
+                            likes = detail_nums["likes"]
+
                         # 多次滚动以触发评论加载
                         if fetch_comments:
                             for _ in range(3):
                                 await page.evaluate("window.scrollBy(0, 1500)")
-                                await page.wait_for_timeout(1500)
+                                await page.wait_for_timeout(800)
 
                             comments_list = await page.evaluate(
                                 """(maxC) => {
@@ -327,15 +333,37 @@ async def scrape_profile(
                     except Exception as e:
                         print(f"  [{idx+1}] 详情页异常: {e}", file=sys.stderr)
 
+                # 返回账号主页供下一次点击
+                if idx < len(weibo_data) - 1:
+                    for _ in range(3):
+                        try:
+                            await page.go_back(wait_until="domcontentloaded", timeout=15000)
+                            await page.wait_for_timeout(1500)
+                            if "weibo.com" in page.url and "detail" not in page.url:
+                                break
+                        except Exception:
+                            continue
+
                 # 如果没有取到详情页完整文本，回退到首页截断文本
                 if not full_text:
                     full_text = (item.get("text", "") or "")[:300]
+
+                pub_time = item.get("pubTime", "") or ""
+                if not pub_time and detail_url:
+                    pub_time = await page.evaluate("""
+                        () => {
+                            var el = document.querySelector('time, [datetime], [class*=_time_]');
+                            return el ? (el.textContent || el.getAttribute('datetime') || '').trim() : '';
+                        }
+                    """)
+                pub_time = normalize_time(pub_time)
 
                 weibo = WeiboEngagement(
                     text=full_text,
                     reposts=reposts,
                     comments=comment_count,
                     likes=likes,
+                    published_at=pub_time,
                     url=detail_url,
                     comments_list=[CommentItem(**c) for c in comments_list],
                 )
@@ -385,19 +413,7 @@ def main():
 
     output = result.model_dump(mode="json")
 
-    if args.output:
-        with open(args.output, "w", encoding="utf-8") as f:
-            json.dump(output, f, ensure_ascii=False, indent=2)
-        print(f"结果已保存到: {args.output}")
-    else:
-        import tempfile
-        tmp = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json", delete=False)
-        json.dump(output, tmp, ensure_ascii=False, indent=2)
-        tmp.close()
-        with open(tmp.name, "r", encoding="utf-8") as f:
-            sys.stdout = open(sys.stdout.fileno(), mode="w", encoding="utf-8", errors="replace")
-            print(f.read())
-        os.unlink(tmp.name)
+    write_output(output, args.output)
 
 
 if __name__ == "__main__":

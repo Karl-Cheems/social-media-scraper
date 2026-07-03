@@ -6,3 +6,7 @@ __pycache__/
 .claude/skills/lark-shared/lark-cli.exe
 .claude/skills/lark-shared/qr_login.png
 .env
+build/
+dist/
+*.spec
+data/

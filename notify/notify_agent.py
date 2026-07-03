@@ -41,7 +41,14 @@ DEFAULT_CHAT = _read_env("AGENT_CHAT") or "ou_66f8c01a0c53113c68ced2a1685ddf72"
 
 def detect_type(data: dict) -> str:
     """自动识别数据类型，返回中文标签。"""
+    if "platforms" in data and "keywords" in data:
+        return "关键词搜索"
+    if "platforms" in data:
+        return "全平台热搜"
     if "topics" in data:
+        items = data.get("topics", [])
+        if items and "hot_badge" in items[0]:
+            return "抖音热榜"
         return "微博热搜"
     if "accounts" in data:
         return "竞品监控"
@@ -58,21 +65,62 @@ def build_summary(data: dict, data_type: str) -> str:
     """构建发送给 Agent 的文本摘要。"""
     lines = [f"【{data_type}】{data.get('collected_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))}"]
 
-    if "topics" in data:
+    if "platforms" in data and "keywords" in data:
+        keywords = data.get("keywords", [])
+        lines.append(f"关键词: {'、'.join(keywords)}")
+        for p in data["platforms"]:
+            platform = p.get("platform", "")
+            keyword = p.get("keyword", "")
+            items = p.get("items", [])
+            name = "微博" if platform == "weibo" else "小红书"
+            lines.append(f"\n【{name} · {keyword}】（{len(items)} 条）")
+            for item in items[:5]:
+                text = (item.get("text", "") or item.get("title", "") or "")[:80]
+                likes = item.get("likes", "?")
+                comments_cnt = item.get("comments", "?")
+                lines.append(f"  {text} (👍{likes} 💬{comments_cnt})")
+                cc = item.get("comments_list", [])
+                for c in cc[:3]:
+                    lines.append(f"    💬 {c.get('user', '')}: {(c.get('content', '') or '')[:40]}")
+
+    elif "platforms" in data:
+        platforms = data.get("platforms", [])
+        for p in platforms:
+            platform = p.get("platform", "?")
+            name = "抖音" if platform == "douyin" else "微博" if platform == "weibo" else platform
+            topics = p.get("topics", [])
+            lines.append(f"\n═══ {name}热榜（共{len(topics)}条）═══")
+            for t in topics[:20]:
+                rank = t.get("rank", "?")
+                title = t.get("title", "")
+                hot = t.get("hot_value", "")
+                badge = t.get("hot_badge", "") or ""
+                hot_str = f"({hot})" if hot else ""
+                badge_str = f"[{badge}]" if badge else ""
+                lines.append(f"#{rank} {title} {hot_str}{badge_str}")
+                if platform == "weibo":
+                    answer = t.get("zhishou_answer") or {}
+                    answer_text = (answer.get("text", "") or "")[:200]
+                    if answer_text:
+                        lines.append(f"  🤖 {answer_text}")
+
+    elif "topics" in data:
+        data_type_label = detect_type(data)
         for t in data["topics"][:20]:
             rank = t.get("rank", "?")
             title = t.get("title", "")
             hot = t.get("hot_value", "")
-            badge = f"[{hot}]" if hot else ""
-            posts = t.get("posts", [])
-            post_texts = []
-            for p in posts[:3]:
-                text = (p.get("text", "") or "")[:100]
-                likes = p.get("likes", "?")
-                comments = p.get("comments", "?")
-                post_texts.append(f"  {text} (👍{likes} 💬{comments})")
-            lines.append(f"\n#{rank} {title}{badge}")
-            lines.extend(post_texts)
+            badge = t.get("hot_badge", "") or ""
+            hot_str = f"({hot})" if hot else ""
+            badge_str = f"[{badge}]" if badge else ""
+            lines.append(f"\n#{rank} {title} {hot_str}{badge_str}")
+            if data_type_label != "抖音热榜":
+                posts = t.get("posts", [])
+                for p in posts[:3]:
+                    text = (p.get("text", "") or "")[:100]
+                    likes = p.get("likes", "?")
+                    comments = p.get("comments", "?")
+                    lines.append(f"  {text} (👍{likes} 💬{comments})")
 
     elif "accounts" in data:
         for a in data["accounts"]:

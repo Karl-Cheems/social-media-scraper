@@ -12,31 +12,51 @@ import argparse
 import asyncio
 import json
 import os
+import random
 import re
 import sys
+import time
+
+from common import write_output
 
 import weibo_scraper
 import xiaohongshu_scraper
 
 
-def detect_platform(url: str) -> str:
-    """根据 URL 判断平台。"""
-    if re.search(r'weibo\.com', url):
+def detect_platform(identifier: str) -> str:
+    """根据输入判断平台。weibo URL → weibo，纯数字 → xiaohongshu，xiaohongshu URL → xiaohongshu。"""
+    if re.search(r'weibo\.com', identifier):
         return 'weibo'
-    if re.search(r'xiaohongshu\.com', url):
+    if re.search(r'xiaohongshu\.com', identifier):
         return 'xiaohongshu'
-    raise ValueError(f"不支持的平台，URL: {url}")
+    if re.match(r'^\d+$', identifier.strip()):
+        return 'xiaohongshu'
+    raise ValueError(f"不支持的平台，输入: {identifier}")
 
 
-async def scrape_account(url: str, limit: int, fetch_comments: bool,
+def _build_profile_url(identifier: str) -> str:
+    """把输入转为 scraper 实际使用的 profile URL。微博保持原样，小红书号 → profile/{id}。"""
+    platform = detect_platform(identifier)
+    if platform == 'weibo':
+        return identifier
+    if platform == 'xiaohongshu':
+        uid = identifier.strip()
+        if 'xiaohongshu.com' in uid:
+            return uid
+        return f"https://www.xiaohongshu.com/user/profile/{uid}"
+    return identifier
+
+
+async def scrape_account(identifier: str, limit: int, fetch_comments: bool,
                          max_comments: int, headless: bool,
                          no_content: bool = False) -> dict:
     """采集单个账号的数据，返回统一格式的 dict。"""
-    platform = detect_platform(url)
+    platform = detect_platform(identifier)
+    profile_url = _build_profile_url(identifier)
 
     if platform == 'weibo':
         result = await weibo_scraper.scrape_profile(
-            profile_url=url,
+            profile_url=profile_url,
             limit=limit,
             headless=headless,
             fetch_comments=fetch_comments,
@@ -45,7 +65,7 @@ async def scrape_account(url: str, limit: int, fetch_comments: bool,
         return {
             "platform": "weibo",
             "author": result.author,
-            "url": url,
+            "url": profile_url,
             "total_collected": result.total_collected,
             "items": [
                 {
@@ -54,6 +74,7 @@ async def scrape_account(url: str, limit: int, fetch_comments: bool,
                     "comments": w.comments,
                     "likes": w.likes,
                     "url": w.url,
+                    "published_at": w.published_at,
                     "comments_list": [
                         {"user": c.user, "content": c.content, "likes": c.likes}
                         for c in w.comments_list
@@ -65,7 +86,7 @@ async def scrape_account(url: str, limit: int, fetch_comments: bool,
 
     elif platform == 'xiaohongshu':
         result = await xiaohongshu_scraper.scrape_profile(
-            profile_url=url,
+            profile_url=profile_url,
             limit=limit,
             headless=headless,
             fetch_comments=fetch_comments,
@@ -75,7 +96,7 @@ async def scrape_account(url: str, limit: int, fetch_comments: bool,
         return {
             "platform": "xiaohongshu",
             "author": result.author,
-            "url": url,
+            "url": profile_url,
             "total_collected": result.total_collected,
             "items": [
                 {
@@ -85,6 +106,7 @@ async def scrape_account(url: str, limit: int, fetch_comments: bool,
                     "collects": n.collects,
                     "comments": n.comments,
                     "url": n.url,
+                    "published_at": n.published_at,
                     "comments_list": [
                         {"user": c.user, "content": c.content, "likes": c.likes}
                         for c in n.comments_list
@@ -133,11 +155,15 @@ def main():
     async def run_all():
         results = []
         for idx, url in enumerate(urls):
+            if idx > 0:
+                delay = random.uniform(2, 4)
+                print(f"  ⏳ 账号采集间隔（等待 {delay:.1f}s）", file=sys.stderr)
+                time.sleep(delay)
             try:
                 platform = detect_platform(url)
                 print(f"\n[{idx+1}/{len(urls)}] 正在采集 {platform} 账号: {url}", file=sys.stderr)
                 account_data = await scrape_account(
-                    url=url,
+                    identifier=url,
                     limit=args.limit,
                     fetch_comments=not args.no_comments,
                     max_comments=args.max_comments,
@@ -160,19 +186,7 @@ def main():
 
     output = asyncio.run(run_all())
 
-    if args.output:
-        with open(args.output, "w", encoding="utf-8") as f:
-            json.dump(output, f, ensure_ascii=False, indent=2)
-        print(f"结果已保存到: {args.output}")
-    else:
-        import tempfile
-        tmp = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json", delete=False)
-        json.dump(output, tmp, ensure_ascii=False, indent=2)
-        tmp.close()
-        with open(tmp.name, "r", encoding="utf-8") as f:
-            sys.stdout = open(sys.stdout.fileno(), mode="w", encoding="utf-8", errors="replace")
-            print(f.read())
-        os.unlink(tmp.name)
+    write_output(output, args.output)
 
 
 if __name__ == "__main__":

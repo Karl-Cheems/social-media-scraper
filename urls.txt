@@ -1,2 +1,84 @@
+# 品牌官方账号监控 URL 列表
+# 每行一个 URL，支持微博和小红书
+# 小红书直接写小红书号（数字），微博写完整 URL
+# 以 # 开头的行会被忽略
+
+# === 元气森林 ===
+27247124186
+https://weibo.com/genkiforest
+
+# === 麦当劳 ===
 https://weibo.com/u/1947211342
-https://www.xiaohongshu.com/user/profile/5642eac50bf90c3de69e8997?xsec_token=ABF8wqAXRZKEyrKSe5V2lw0WyD6gCXkvbgo97wemZQ__I%3D&xsec_source=pc_search
+27247902953
+
+# === 肯德基 ===
+https://weibo.com/kfcchina
+49314856083
+
+# === 老乡鸡 ===
+https://weibo.com/u/2659356083
+49321982942
+
+# === 东鹏补水啦 ===
+https://weibo.com/u/3010208447
+27760315393
+
+# === 安慕希 ===
+https://weibo.com/u/3980995961
+95852226055
+
+# === KEEP ===
+https://weibo.com/gotokeep
+49314411526
+
+# === 多邻国 ===
+https://weibo.com/u/5321120826
+7016281187
+
+# === 闲鱼 ===
+https://weibo.com/taoershou
+27760532972
+
+# === Deeyeo 德佑 ===
+https://weibo.com/u/6237011372
+27769186089
+
+# === 卫龙 ===
+https://weibo.com/weilongmeiwei
+49314054118
+
+# === 麻辣王子 ===
+https://weibo.com/u/5147242829
+27760936071
+
+# === 淘宝 ===
+https://weibo.com/taobao
+27760985496
+
+# === 好望水 ===
+https://weibo.com/u/6736161333
+27760604101
+
+# === 可口可乐 ===
+https://weibo.com/u/1795839430
+49313164112
+
+# === 瑞幸咖啡 ===
+https://weibo.com/u/6349791448
+49321556270
+
+# === 旺旺（旺仔俱乐部） ===
+https://weibo.com/u/5719567801
+27247072952
+
+# === 喜之郎 ===
+https://weibo.com/u/2781437874
+27247534108
+
+# === 钉钉 ===
+https://weibo.com/dingdingtalk
+27760045492
+
+# === 蜜雪冰城 ===
+https://weibo.com/zzmxbc
+27247496277
