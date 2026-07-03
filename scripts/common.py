@@ -35,7 +35,7 @@ class CommentItem(BaseModel):
 # ---------- 随机延迟（风控规避） ----------
 
 
-async def random_delay(min_sec: float = 2.0, max_sec: float = 5.0, label: str = ""):
+async def random_delay(min_sec: float = 4.0, max_sec: float = 8.0, label: str = ""):
     """随机等待 min_sec ~ max_sec 秒，模拟人类操作间隔。
 
     Args:

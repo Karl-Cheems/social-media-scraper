@@ -76,7 +76,7 @@ def main():
         })
 
     # ── 平台切换延迟 ──
-    delay = random.uniform(5, 10)
+    delay = random.uniform(10, 15)
     print(f"  ⏳ 平台切换间隔（等待 {delay:.1f}s）", file=sys.stderr)
     time.sleep(delay)
 
@@ -114,7 +114,7 @@ def main():
             })
 
         if len(boards_to_run) > 1 and b == boards_to_run[0]:
-            delay = random.uniform(3, 6)
+            delay = random.uniform(5, 10)
             print(f"  ⏳ 榜单切换间隔（等待 {delay:.1f}s）", file=sys.stderr)
             time.sleep(delay)
 

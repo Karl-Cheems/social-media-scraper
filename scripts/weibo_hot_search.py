@@ -173,7 +173,7 @@ async def scrape_hot_search(
             print(f"\n开始提取前 {limit} 条热搜的热门微博...", file=sys.stderr)
             for idx, item in enumerate(show_list):
                 if idx > 0:
-                    await random_delay(1, 3, "热搜话题间隔")
+                    await random_delay(3, 6, "热搜话题间隔")
                 try:
                     topic = await _fetch_topic_detail(
                         page, item, board=board
@@ -340,7 +340,7 @@ def main():
             results.extend(batch)
             if b == "hot":
                 import time
-                time.sleep(random.uniform(3, 6))
+                time.sleep(random.uniform(5, 10))
     else:
         results = asyncio.run(scrape_hot_search(
             limit=args.limit,

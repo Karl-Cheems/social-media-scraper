@@ -293,8 +293,57 @@ async def _fetch_weibo_detail(page, item: dict, search_url: str, max_comments: i
 
 
 async def search_weibo(page, keyword: str, per_keyword: int, max_comments: int) -> list[dict]:
-    """在微博搜索关键词，总是进入详情页获取完整正文和评论。"""
+    """在微博搜索关键词，先尝试智搜回答，若没有则走普通搜索结果。"""
     search_url = f"https://s.weibo.com/weibo?q={quote(keyword)}&xsort=hot"
+
+    # 先试智搜
+    try:
+        zhishou_url = f"https://s.weibo.com/aisearch?q={quote(keyword)}&Refer=weibo_aisearch"
+        await page.goto(zhishou_url, wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_timeout(3000)
+
+        # 提取智搜回答
+        zhishou_text = await page.evaluate("""
+            () => {
+                var all = document.body.innerText || '';
+                var lines = all.split(String.fromCharCode(10));
+                var skip = new Set(['NEW', '综合', '用户', '实时', '视频', '图片', '关注', '超话',
+                    '高级搜索', '搜索结果', '更多', '刷新', '我的', '微博热搜', '热搜榜', '文娱榜',
+                    '首页', '推荐', '话题', '智搜']);
+                var clean = [];
+                var inAnswer = false;
+                for (var i = 0; i < lines.length; i++) {
+                    var l = lines[i].trim();
+                    if (!l) continue;
+                    if (l === '回答' || l === '深度思考') { inAnswer = true; continue; }
+                    if (l.indexOf('信源追溯') >= 0 || l.indexOf('风险提示') >= 0) break;
+                    if (skip.has(l)) continue;
+                    if (inAnswer && l.length > 3) clean.push(l);
+                }
+                return clean.join(String.fromCharCode(10));
+            }
+        """)
+
+        if zhishou_text and len(zhishou_text) > 50:
+            print(f"    ✅ 使用智搜回答（{len(zhishou_text)} 字符）", file=sys.stderr)
+            return [{
+                "title": f"智搜 · {keyword}",
+                "text": zhishou_text,
+                "author": "智搜回答",
+                "reposts": 0,
+                "comments": 0,
+                "likes": 0,
+                "collects": 0,
+                "url": zhishou_url,
+                "time": "",
+                "comments_list": [],
+            }]
+        else:
+            print(f"    智搜回答为空，走普通搜索", file=sys.stderr)
+    except Exception as e:
+        print(f"    智搜失败（{e}），走普通搜索", file=sys.stderr)
+
+    # 走普通搜索
     items = await _search_weibo(page, keyword, per_keyword)
 
     print(f"    进入详情页获取完整正文和评论...", file=sys.stderr)
@@ -310,9 +359,7 @@ async def search_weibo(page, keyword: str, per_keyword: int, max_comments: int) 
         cc = f"({len(enriched.get('comments_list', []))}条评论)" if enriched.get("comments_list") else ""
         print(f"      [{idx+1}] {t}... 转{r} 评{c} 赞{l}{cc}", file=sys.stderr)
 
-        # 如果是最后一条，不用再返回搜索页
         if idx < len(items) - 1:
-            # 回到搜索结果页（同域导航不会被风控拦截）
             await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
             await page.wait_for_timeout(3000)
 
@@ -386,6 +433,47 @@ async def _search_xiaohongshu(page, keyword: str, per_keyword: int) -> list[dict
     except Exception as e:
         print(f"    小红书搜索异常: {e}", file=sys.stderr)
         return []
+
+    # 打开筛选面板，设置：最多点赞 + 一周内
+    try:
+        await page.evaluate("document.querySelector('.filter').click()")
+        await page.wait_for_timeout(1500)
+
+        # 点击"最多点赞"
+        await page.evaluate("""
+            () => {
+                var tags = document.querySelectorAll('.filter-panel .tags');
+                for (var t of tags) {
+                    if ((t.textContent || '').trim() === '最多点赞') {
+                        t.click(); return true;
+                    }
+                }
+                return false;
+            }
+        """)
+        await page.wait_for_timeout(800)
+
+        # 点击"一周内"
+        await page.evaluate("""
+            () => {
+                var tags = document.querySelectorAll('.filter-panel .tags');
+                for (var t of tags) {
+                    if ((t.textContent || '').trim() === '一周内') {
+                        t.click(); return true;
+                    }
+                }
+                return false;
+            }
+        """)
+        await page.wait_for_timeout(1500)
+
+        # 关闭筛选面板
+        await page.evaluate("document.querySelector('.filter').click()")
+        await page.wait_for_timeout(1500)
+
+        print(f"    筛选: 最多点赞 + 一周内", file=sys.stderr)
+    except Exception as e:
+        print(f"    筛选设置失败: {e}", file=sys.stderr)
 
     # 滚动加载
     max_scroll = 50
@@ -671,6 +759,7 @@ async def search_keywords(
     platforms: list[str],
     per_keyword: int = 10,
     max_comments: int = 5,
+    min_interaction: int = 0,
     headless: bool = True,
 ) -> dict:
     """多关键词多平台搜索。总是进入详情页提取完整正文和评论。
@@ -679,6 +768,7 @@ async def search_keywords(
         platforms: 平台列表，可包含 "weibo" 和/或 "xiaohongshu"
         per_keyword: 每个关键词每个平台采集多少条结果
         max_comments: 每条内容最多采集评论数（默认 5）
+        min_interaction: 互动量（点赞+收藏/转发）最低阈值，低于此值则跳过该关键词
         headless: 是否无头模式
 
     Returns:
@@ -734,7 +824,7 @@ async def search_keywords(
                     else:
                         continue
 
-                    # 将 comments_list 转换为纯 dict（非 CommentItem 对象）
+                    # 将 comments_list 转换为纯 dict + 互动量筛选
                     clean_items = []
                     for item in items:
                         raw_comments = item.get("comments_list", [])
@@ -754,7 +844,21 @@ async def search_keywords(
                             "time": item.get("time", ""),
                             "comments_list": clean_comments,
                         }
-                        clean_items.append(clean_item)
+                        if min_interaction > 0:
+                            likes = max(clean_item.get("likes", 0) or 0, 0)
+                            collects = max(clean_item.get("collects", 0) or 0, 0)
+                            reposts = max(clean_item.get("reposts", 0) or 0, 0)
+                            total = likes + max(collects, reposts)
+                            if total >= min_interaction:
+                                clean_items.append(clean_item)
+                            else:
+                                print(f"    跳过: 互动量{total}<{min_interaction} - {(clean_item.get('text') or clean_item.get('title',''))[:40]}", file=sys.stderr)
+                        else:
+                            clean_items.append(clean_item)
+
+                    if min_interaction > 0 and not clean_items:
+                        print(f"  ⎭ 关键词[{keyword}]全部低于阈值({min_interaction})，不返回", file=sys.stderr)
+                        continue
 
                     platform_results.append({
                         "platform": platform,
@@ -762,6 +866,7 @@ async def search_keywords(
                         "total_items": len(clean_items),
                         "items": clean_items,
                     })
+                    print(f"  完成：{len(clean_items)} 条", file=sys.stderr)
 
         finally:
             await context.close()
@@ -795,6 +900,10 @@ def main():
         help="每条内容最多采集评论数（默认 5）",
     )
     parser.add_argument(
+        "--min-interaction", type=int, default=0,
+        help="互动量（点赞+收藏/转发）最低阈值，低于此值则跳过该关键词（默认 0 不过滤）",
+    )
+    parser.add_argument(
         "--visible", action="store_true",
         help="显示浏览器窗口（默认无头模式）",
     )
@@ -820,6 +929,8 @@ def main():
     print(f"搜索平台: {platform_list}", file=sys.stderr)
     print(f"每关键词每平台采集 {args.per_keyword} 条", file=sys.stderr)
     print(f"最大评论数: {args.max_comments}", file=sys.stderr)
+    if args.min_interaction > 0:
+        print(f"互动量阈值: {args.min_interaction}", file=sys.stderr)
     print(file=sys.stderr)
 
     result = asyncio.run(search_keywords(
@@ -827,6 +938,7 @@ def main():
         platforms=platform_list,
         per_keyword=args.per_keyword,
         max_comments=args.max_comments,
+        min_interaction=args.min_interaction,
         headless=not args.visible,
     ))
 

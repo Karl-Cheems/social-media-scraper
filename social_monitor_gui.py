@@ -343,7 +343,7 @@ class SocialMonitorGUI:
         ttk.Label(r2, text="每个关键词:").pack(side="left", padx=(0, 4))
         self.kw_per = tk.StringVar(value="5")
         ttk.Spinbox(r2, from_=1, to=20, textvariable=self.kw_per, width=5).pack(side="left", padx=(0, 4))
-        ttk.Label(r2, text="条").pack(side="left")
+        ttk.Label(r2, text="条  ").pack(side="left")
 
         r3 = ttk.Frame(cfg, style="Card.TLabelframe")
         r3.pack(fill="x", pady=(6, 8))
@@ -351,6 +351,9 @@ class SocialMonitorGUI:
         ttk.Checkbutton(r3, text="发送到飞书", variable=self.kw_fs).pack(side="left", padx=(0, 12))
         self.kw_agent = tk.BooleanVar(value=True)
         ttk.Checkbutton(r3, text="发送到 AI Agent", variable=self.kw_agent).pack(side="left")
+        self.kw_select_all_btn = ttk.Button(r3, text="全选关键词", style="Outline.TButton",
+                                            command=self._toggle_all_kw, width=12)
+        self.kw_select_all_btn.pack(side="right", padx=(4, 0))
 
         btnf = ttk.Frame(f, style="TFrame")
         btnf.pack(fill="x", padx=8, pady=(4, 0))
@@ -733,6 +736,15 @@ class SocialMonitorGUI:
             cmd.append("--visible")
 
         self._run_script_common("hot", cmd, self.hot_fs.get(), self.hot_agent.get())
+
+    def _toggle_all_kw(self):
+        if not self.kw_checkboxes:
+            return
+        any_checked = any(var.get() for var in self.kw_checkboxes.values())
+        new_val = not any_checked
+        for var in self.kw_checkboxes.values():
+            var.set(new_val)
+        self.kw_select_all_btn.config(text="取消全选" if new_val else "全选关键词")
 
     def _run_keyword(self):
         selected = [kw for kw, var in self.kw_checkboxes.items() if var.get()]
