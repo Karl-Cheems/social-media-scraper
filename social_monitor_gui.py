@@ -320,6 +320,9 @@ class SocialMonitorGUI:
                                               state="readonly", width=14)
         self.kw_product_combo.pack(side="left", padx=(0, 8))
         self.kw_product_combo.bind("<<ComboboxSelected>>", self._on_product_change)
+        self.kw_select_all_btn = ttk.Button(r1, text="全选关键词", style="Outline.TButton",
+                                            command=self._toggle_all_kw, width=12)
+        self.kw_select_all_btn.pack(side="right", padx=(4, 0))
 
         self.kw_frame = ttk.Frame(cfg, style="Card.TLabelframe")
         self.kw_frame.pack(fill="x", pady=(6, 0))
@@ -351,9 +354,6 @@ class SocialMonitorGUI:
         ttk.Checkbutton(r3, text="发送到飞书", variable=self.kw_fs).pack(side="left", padx=(0, 12))
         self.kw_agent = tk.BooleanVar(value=True)
         ttk.Checkbutton(r3, text="发送到 AI Agent", variable=self.kw_agent).pack(side="left")
-        self.kw_select_all_btn = ttk.Button(r3, text="全选关键词", style="Outline.TButton",
-                                            command=self._toggle_all_kw, width=12)
-        self.kw_select_all_btn.pack(side="right", padx=(4, 0))
 
         btnf = ttk.Frame(f, style="TFrame")
         btnf.pack(fill="x", padx=8, pady=(4, 0))
