@@ -102,11 +102,18 @@ async def scrape_profile(
                 search_input = page.locator("input[placeholder*='搜索'], input[class*='search'], input[type='search']").first
             if await search_input.count() == 0:
                 search_input = page.locator("input").first
-            await search_input.wait_for(state="visible", timeout=10000)
+            try:
+                await search_input.wait_for(state="attached", timeout=10000)
+            except Exception:
+                print(f"    搜索框未找到", file=sys.stderr)
+                raise RuntimeError("搜索框未找到")
             try:
                 await search_input.click(force=True, timeout=5000)
             except Exception:
-                await search_input.focus()
+                try:
+                    await search_input.focus()
+                except Exception:
+                    pass
             await asyncio.sleep(0.3)
             await page.keyboard.press("Control+a")
             await asyncio.sleep(0.1)

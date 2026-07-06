@@ -376,20 +376,29 @@ async def _do_xiaohongshu_search(page, keyword: str) -> bool:
     await page.goto("https://www.xiaohongshu.com/explore", wait_until="commit", timeout=15000)
     await page.wait_for_timeout(3000)
 
-    # 1. 点击搜索框 — 小红书首页可能有覆盖层拦截，用 force: true 强制点击
-    # 优先用 #search-input，fallback 到 placeholder 匹配
+    # 1. 点击搜索框 — 小红书首页可能有覆盖层拦截
+    # 优先用 #search-input，但可能是 hidden 状态（display:none或opacity:0）
+    # fallback 到 placeholder 匹配和通用 input
     search_input = page.locator("#search-input").first
     if await search_input.count() == 0:
         search_input = page.locator("input[placeholder*='搜索'], input[class*='search'], input[type='search']").first
     if await search_input.count() == 0:
         search_input = page.locator("input").first
 
-    await search_input.wait_for(state="visible", timeout=10000)
+    try:
+        await search_input.wait_for(state="attached", timeout=10000)
+    except Exception:
+        print(f"    搜索框未找到", file=sys.stderr)
+        return False
+
+    # 用 force=True 点，无视 hidden 状态
     try:
         await search_input.click(force=True, timeout=5000)
     except Exception:
-        # 实在点不到就 focus
-        await search_input.focus()
+        try:
+            await search_input.focus()
+        except Exception:
+            pass
     await random_delay(0.3, 0.6, "点击搜索框")
 
     # 2. 全选 → Delete 清空（不碰 element.value，防风控劫持）
