@@ -453,12 +453,14 @@ class SocialMonitorGUI:
         ttk.Checkbutton(r3, text="获取评论", variable=self.acc_comment).pack(side="left", padx=(0, 12))
         self.acc_visible = tk.BooleanVar(value=False)
         ttk.Checkbutton(r3, text="显示浏览器", variable=self.acc_visible).pack(side="left")
-        ttk.Label(r2, text="（无头模式遇到登录会自动弹出浏览器）", font=FONT_SM, foreground=TEXT_SECONDARY).pack(side="left", padx=(10, 0))
 
         r4 = ttk.Frame(cfg, style="Card.TLabelframe")
         r4.pack(fill="x", pady=(6, 8))
         self.acc_agent = tk.BooleanVar(value=True)
         ttk.Checkbutton(r4, text="发送到 AI Agent", variable=self.acc_agent).pack(side="left")
+        self.acc_visible = tk.BooleanVar(value=False)
+        ttk.Checkbutton(r4, text="显示浏览器", variable=self.acc_visible).pack(side="left", padx=(10, 0))
+        ttk.Label(r4, text="（无头模式遇到登录会自动弹出浏览器）", font=FONT_SM, foreground=TEXT_SECONDARY).pack(side="left", padx=(10, 0))
 
         btnf = ttk.Frame(f, style="TFrame")
         btnf.pack(fill="x", padx=8, pady=(4, 0))
