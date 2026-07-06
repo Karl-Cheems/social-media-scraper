@@ -647,13 +647,9 @@ class SocialMonitorGUI:
                     if not raw_line:
                         break
                     try:
-                        line = raw_line.decode("utf-8").rstrip()
-                    except UnicodeDecodeError:
-                        try:
-                            line = raw_line.decode("gbk", errors="replace").rstrip()
-                        except UnicodeDecodeError:
-                            # 兜底：替换非法字符
-                            line = raw_line.decode("utf-8", errors="replace").rstrip()
+                        line = raw_line.decode("utf-8", errors="replace").rstrip()
+                    except Exception:
+                        line = raw_line.decode("gbk", errors="replace").rstrip()
                     self._log(tab_name, line)
                 proc.wait()
 
