@@ -166,10 +166,10 @@ async def launch_browser(
 
     # 3. 清理锁文件
     for f in ["SingletonLock", "SingletonCookie", "SingletonSocket"]:
-        p = os.path.join(pw_data_dir, f)
-        if os.path.exists(p):
+        p2 = os.path.join(pw_data_dir, f)
+        if os.path.exists(p2):
             try:
-                os.remove(p)
+                os.remove(p2)
             except Exception:
                 pass
 
