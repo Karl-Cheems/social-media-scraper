@@ -90,7 +90,10 @@ async def scrape_profile(
                     context, page = await launch_browser(p, headless=False, user_data_dir=edge_user_data, label="xiaohongshu")
                     await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)
                     await page.wait_for_timeout(2000)
-                await wait_for_login(page)
+                    await wait_for_login(page)
+                else:
+                    print("\n⚠️ 检测到未登录，请在浏览器窗口中完成登录", file=sys.stderr)
+                    await wait_for_login(page)
 
             # ── 步骤 2：模拟点击搜索框输入用户ID ──────────
             print(f"步骤2: 搜索用户 {user_id}", file=sys.stderr)

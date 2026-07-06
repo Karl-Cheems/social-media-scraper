@@ -158,6 +158,8 @@ async def launch_browser(
     """
     for attempt in range(2):
         try:
+            # headless 下检测到未登录时已经在外部处理了，这里直接启动
+            # 首次启动如果 headless=True 但 Edge User Data 被占用，先 kill
             context = await p.chromium.launch_persistent_context(
                 user_data_dir=user_data_dir,
                 channel="msedge",
@@ -167,7 +169,7 @@ async def launch_browser(
             )
             page = await context.new_page()
             return context, page
-        except TargetClosedError:
+        except Exception:  # 捕获 TargetClosedError 或权限错误
             print(
                 f"  Edge 启动失败（attempt {attempt + 1}），正在关闭已有 Edge 进程...",
                 file=sys.stderr,

@@ -78,7 +78,10 @@ async def scrape_profile(
                     )
                     await page.goto(profile_url, wait_until="domcontentloaded", timeout=30000)
                     await page.wait_for_timeout(5000)
-                await wait_for_login(page)
+                    await wait_for_login(page)
+                else:
+                    print("\n⚠️ 检测到未登录，请在浏览器窗口中完成登录", file=sys.stderr)
+                    await wait_for_login(page)
 
             # 获取账号名称
             author_name = await page.evaluate(
