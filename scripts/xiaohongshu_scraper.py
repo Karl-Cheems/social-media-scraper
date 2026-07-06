@@ -95,72 +95,48 @@ async def scrape_profile(
                     print("\n⚠️ 检测到未登录，请在浏览器窗口中完成登录", file=sys.stderr)
                     await wait_for_login(page)
 
-            # ── 步骤 2：模拟点击搜索框输入用户ID ──────────
+            # ── 步骤 2：直接走搜索页 URL（绕过搜索框输入问题）──
             print(f"步骤2: 搜索用户 {user_id}", file=sys.stderr)
-            search_input = page.locator("#search-input").first
-            if await search_input.count() == 0:
-                search_input = page.locator("input[placeholder*='搜索'], input[class*='search'], input[type='search']").first
-            if await search_input.count() == 0:
-                search_input = page.locator("input").first
-            try:
-                await search_input.wait_for(state="attached", timeout=10000)
-            except Exception:
-                print(f"    搜索框未找到", file=sys.stderr)
-                raise RuntimeError("搜索框未找到")
-            try:
-                await search_input.click(force=True, timeout=5000)
-            except Exception:
-                try:
-                    await search_input.focus()
-                except Exception:
-                    pass
-            await asyncio.sleep(0.3)
-            await page.keyboard.press("Control+a")
-            await asyncio.sleep(0.1)
-            await page.keyboard.press("Delete")
-            await asyncio.sleep(0.2)
-            await page.keyboard.type(user_id, delay=60)
-            await asyncio.sleep(0.3)
-            await page.keyboard.press("Enter")
-            await page.wait_for_timeout(1500)
+            search_url = f"https://www.xiaohongshu.com/search_result?keyword={user_id}&source=web_search_result_notes"
+            await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(3000)
 
-            # ── 步骤 3：搜索页点击用户卡片进入主页 ──────────
+            # ── 步骤 3：在搜索结果中找到对应的用户卡片 → 进入主页 ──
             print(f"步骤3: 在搜索结果中点击用户卡片", file=sys.stderr)
             found_user = False
             try:
-                await page.wait_for_timeout(1000)
-                user_card_info = await page.evaluate("""
+                user_href = await page.evaluate("""
                     (targetId) => {
                         var links = document.querySelectorAll('a[href*="/user/profile/"]');
                         for (var link of links) {
-                            var t = link.textContent;
-                            if (t.includes(targetId) && (t.includes('粉丝') || t.includes('关注'))) {
-                                var r = link.getBoundingClientRect();
-                                return { x: r.left + r.width/2, y: r.top + r.height/2, href: link.href.split('?')[0] };
+                            var t = (link.textContent || '');
+                            if (t.indexOf(targetId) >= 0) {
+                                return link.href;
                             }
                         }
+                        // 如果没有匹配 ID 的，取第一个看起来像品牌的用户卡片
                         for (var link of links) {
-                            var t = link.textContent;
-                            if (t !== '我' && t.length > 20) {
-                                var r = link.getBoundingClientRect();
-                                return { x: r.left + r.width/2, y: r.top + r.height/2, href: link.href.split('?')[0] };
+                            var t = (link.textContent || '');
+                            if (t.indexOf('粉丝') >= 0 && t.length > 20) {
+                                return link.href;
                             }
                         }
                         return null;
                     }
                 """, user_id)
 
-                if user_card_info:
+                if user_href:
                     print(f"  进入用户主页", file=sys.stderr)
-                    await page.evaluate(f"window.location.href = '{user_card_info['href']}'")
+                    # 去掉 xsec_token 参数避免过期
+                    profile_url = user_href.split('?')[0]
+                    await page.evaluate(f"window.location.href = '{profile_url}'")
                     try:
                         await page.wait_for_url("**/user/profile/**", timeout=15000)
                         await page.wait_for_timeout(2000)
                     except Exception:
                         print(f"  导航超时，当前URL: {page.url}", file=sys.stderr)
 
-                    cur = page.url
-                    if "user/profile" not in cur:
+                    if "user/profile" not in page.url:
                         print(f"  ✗ 无法进入用户主页 {user_id}", file=sys.stderr)
                         raise RuntimeError(f"无法进入用户主页 {user_id}")
                     found_user = True
@@ -173,10 +149,6 @@ async def scrape_profile(
                 print(f"  ✗ 无法进入用户主页 {user_id}", file=sys.stderr)
                 raise RuntimeError(f"无法进入用户主页 {user_id}")
 
-            try:
-                await page.wait_for_url("**/user/profile/**", timeout=15000)
-            except Exception:
-                pass
             await page.wait_for_timeout(2000)
 
             # ── 获取账号名称 ─────────────────────────────

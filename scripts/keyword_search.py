@@ -370,52 +370,14 @@ async def search_weibo(page, keyword: str, per_keyword: int, max_comments: int) 
 
 
 async def _do_xiaohongshu_search(page, keyword: str) -> bool:
-    """模拟真人搜索操作：点击搜索框 → 逐字输入 → 回车搜索。
-    Returns True 如果搜索结果正常加载。
-    """
-    await page.goto("https://www.xiaohongshu.com/explore", wait_until="commit", timeout=15000)
-    await page.wait_for_timeout(3000)
+    """直接构造搜索 URL 发起搜索（绕过搜索框输入的风控问题）。"""
+    search_url = f"https://www.xiaohongshu.com/search_result?keyword={quote(keyword)}&source=web_search_result_notes"
+    print(f"  小红书搜索: {keyword}", file=sys.stderr)
 
-    # 1. 点击搜索框 — 小红书首页可能有覆盖层拦截
-    # 优先用 #search-input，但可能是 hidden 状态（display:none或opacity:0）
-    # fallback 到 placeholder 匹配和通用 input
-    search_input = page.locator("#search-input").first
-    if await search_input.count() == 0:
-        search_input = page.locator("input[placeholder*='搜索'], input[class*='search'], input[type='search']").first
-    if await search_input.count() == 0:
-        search_input = page.locator("input").first
-
-    try:
-        await search_input.wait_for(state="attached", timeout=10000)
-    except Exception:
-        print(f"    搜索框未找到", file=sys.stderr)
-        return False
-
-    # 用 force=True 点，无视 hidden 状态
-    try:
-        await search_input.click(force=True, timeout=5000)
-    except Exception:
-        try:
-            await search_input.focus()
-        except Exception:
-            pass
-    await random_delay(0.3, 0.6, "点击搜索框")
-
-    # 2. 全选 → Delete 清空（不碰 element.value，防风控劫持）
-    await page.keyboard.press("Control+a")
-    await asyncio.sleep(0.2)
-    await page.keyboard.press("Delete")
-    await random_delay(0.3, 0.6, "清空搜索框")
-
-    # 3. 逐字键盘输入（Playwright 底层走真实键盘事件，不走 value setter）
-    await page.keyboard.type(keyword, delay=random.randint(80, 250))
-    await random_delay(0.5, 1.2, "输入完停顿")
-
-    # 4. 回车搜索
-    await page.keyboard.press("Enter")
+    await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
     await page.wait_for_timeout(5000)
 
-    # 5. 验证搜索结果
+    # 验证搜索结果
     has_cards = await page.evaluate("document.querySelectorAll('section.note-item').length > 0")
     if not has_cards:
         print(f"    搜索结果未加载，等待再试...", file=sys.stderr)
