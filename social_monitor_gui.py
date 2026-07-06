@@ -282,6 +282,7 @@ class SocialMonitorGUI:
         ttk.Spinbox(r2, from_=1, to=50, textvariable=self.hot_limit, width=6).pack(side="left", padx=(0, 24))
         self.hot_visible = tk.BooleanVar(value=False)
         ttk.Checkbutton(r2, text="显示浏览器", variable=self.hot_visible).pack(side="left", padx=(0, 16))
+        ttk.Label(r2, text="（无头模式遇到登录会自动弹出浏览器）", font=FONT_SM, foreground=TEXT_SECONDARY).pack(side="left", padx=(10, 0))
 
         r3 = ttk.Frame(cfg, style="Card.TLabelframe")
         r3.pack(fill="x", pady=(6, 8))
@@ -342,6 +343,7 @@ class SocialMonitorGUI:
         self.kw_per = tk.StringVar(value="5")
         ttk.Spinbox(r2, from_=1, to=20, textvariable=self.kw_per, width=5).pack(side="left", padx=(0, 4))
         ttk.Label(r2, text="条  ").pack(side="left")
+        ttk.Label(r2, text="（无头模式遇到登录会自动弹出浏览器）", font=FONT_SM, foreground=TEXT_SECONDARY).pack(side="left", padx=(10, 0))
 
         r3 = ttk.Frame(cfg, style="Card.TLabelframe")
         r3.pack(fill="x", pady=(6, 8))
@@ -451,6 +453,7 @@ class SocialMonitorGUI:
         ttk.Checkbutton(r3, text="获取评论", variable=self.acc_comment).pack(side="left", padx=(0, 12))
         self.acc_visible = tk.BooleanVar(value=False)
         ttk.Checkbutton(r3, text="显示浏览器", variable=self.acc_visible).pack(side="left")
+        ttk.Label(r2, text="（无头模式遇到登录会自动弹出浏览器）", font=FONT_SM, foreground=TEXT_SECONDARY).pack(side="left", padx=(10, 0))
 
         r4 = ttk.Frame(cfg, style="Card.TLabelframe")
         r4.pack(fill="x", pady=(6, 8))
