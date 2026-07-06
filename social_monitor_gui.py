@@ -232,9 +232,7 @@ class SocialMonitorGUI:
                     continue
                 k, v = line.split("=", 1)
                 v = v.strip()
-                if k.strip() == "FEISHU_WEBHOOK":
-                    self.fs_webhook_var.set(v)
-                elif k.strip() == "AGENT_URL":
+                if k.strip() == "AGENT_URL":
                     self.ag_url_var.set(v)
                 elif k.strip() == "AGENT_SENDER":
                     self.ag_sender_var.set(v)
@@ -658,9 +656,6 @@ class SocialMonitorGUI:
                     self._log(tab_name, "  正在发送到飞书...", "yellow")
                     ncmd = [PYTHON, os.path.join(self.script_dir, "notify", "notify_feishu.py"),
                             "-i", tmp_path]
-                    fs_webhook = self.fs_webhook_var.get().strip()
-                    if fs_webhook:
-                        ncmd += ["--webhook", fs_webhook]
                     np = subprocess.Popen(ncmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                           cwd=self.script_dir, env=env)
                     _, ne = np.communicate()
