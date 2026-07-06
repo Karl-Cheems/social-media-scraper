@@ -189,7 +189,52 @@ async def launch_browser(
     return context, page, None  # None = 没有临时目录需要清理
 
 
-# ---------- Edge User Data 目录 ----------
+# ---------- 小红书搜索（模拟点击）----------
+
+async def xhs_search_by_input(page, keyword: str, label: str = ""):
+    """在小红书搜索框输入关键词并搜索。
+    模拟真实用户操作：点击搜索区域 → 输入关键词 → 回车搜索。
+    返回 True 如果成功导航到搜索结果页。
+    """
+    print(f"  🔍 搜索框输入: {keyword}", file=sys.stderr) if label else None
+    try:
+        # 1. 先回到 explore 页
+        if "explore" not in page.url:
+            await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(2000)
+
+        # 2. 点击搜索区域激活输入框
+        search_area = page.locator(".search-area.search-area-opacity").first
+        await search_area.wait_for(state="visible", timeout=10000)
+        await page.wait_for_timeout(random.randint(300, 800))
+        await search_area.click()
+        await page.wait_for_timeout(random.randint(800, 1200))
+
+        # 3. textarea 在 SPA 中可见性为 false，用 force=True 直接输入
+        textarea = page.locator("textarea#search-input").first
+        await page.wait_for_timeout(random.randint(200, 500))
+
+        # 4. 清空 → fill（用 force 绕过可见性检查）
+        await textarea.fill("", force=True, timeout=5000)
+        await page.wait_for_timeout(random.randint(200, 500))
+        for ch in keyword:
+            await page.keyboard.type(ch, delay=random.randint(50, 150))
+        await page.wait_for_timeout(random.randint(800, 1500))
+
+        # 5. 回车搜索
+        await page.keyboard.press("Enter")
+        await page.wait_for_timeout(3000)
+
+        # 6. 等待搜索结果加载（AI 搜索页或普通搜索页）
+        try:
+            await page.wait_for_url("**/search_result**/**", timeout=15000)
+        except Exception:
+            pass
+        await page.wait_for_timeout(2000)
+        return True
+    except Exception as e:
+        print(f"  ⚠️ 搜索框输入失败: {e}", file=sys.stderr)
+        return False
 
 
 def get_edge_user_data() -> str:

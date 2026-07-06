@@ -18,7 +18,7 @@ from urllib.parse import quote
 
 from playwright.async_api import async_playwright
 
-from common import CommentItem, kill_edge, launch_browser, get_edge_user_data, write_output, random_delay, wait_for_login
+from common import CommentItem, kill_edge, launch_browser, get_edge_user_data, write_output, random_delay, wait_for_login, xhs_search_by_input
 
 
 # ---------- 微博搜索 ----------
@@ -370,23 +370,30 @@ async def search_weibo(page, keyword: str, per_keyword: int, max_comments: int) 
 
 
 async def _do_xiaohongshu_search(page, keyword: str) -> bool:
-    """直接构造搜索 URL 发起搜索（绕过搜索框输入的风控问题）。"""
-    search_url = f"https://www.xiaohongshu.com/search_result?keyword={quote(keyword)}&source=web_search_result_notes"
+    """模拟真人操作：打开 explore → 点击搜索框 → 逐字输入 → 回车搜索。"""
     print(f"  小红书搜索: {keyword}", file=sys.stderr)
 
-    await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-    await page.wait_for_timeout(5000)
+    try:
+        ok = await xhs_search_by_input(page, keyword, f"搜索「{keyword}」")
+        if not ok:
+            print(f"    ⚠️ 搜索框输入失败，回退直接URL", file=sys.stderr)
+            search_url = f"https://www.xiaohongshu.com/search_result?keyword={quote(keyword)}&source=web_search_result_notes"
+            await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(5000)
 
-    # 验证搜索结果
-    has_cards = await page.evaluate("document.querySelectorAll('section.note-item').length > 0")
-    if not has_cards:
-        print(f"    搜索结果未加载，等待再试...", file=sys.stderr)
-        await page.wait_for_timeout(8000)
+        # 验证搜索结果
         has_cards = await page.evaluate("document.querySelectorAll('section.note-item').length > 0")
         if not has_cards:
-            print(f"    ⚠️ 搜索结果未加载（可能被风控拦截）", file=sys.stderr)
-            return False
-    return True
+            print(f"    搜索结果未加载，等待再试...", file=sys.stderr)
+            await page.wait_for_timeout(8000)
+            has_cards = await page.evaluate("document.querySelectorAll('section.note-item').length > 0")
+            if not has_cards:
+                print(f"    ⚠️ 搜索结果未加载（可能被风控拦截）", file=sys.stderr)
+                return False
+        return True
+    except Exception as e:
+        print(f"    小红书搜索异常: {e}", file=sys.stderr)
+        return False
 
 
 async def _search_xiaohongshu(page, keyword: str, per_keyword: int) -> list[dict]:

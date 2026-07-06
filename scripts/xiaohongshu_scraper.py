@@ -10,12 +10,13 @@
 
 import argparse
 import asyncio
+import re
 import sys
 
 from pydantic import BaseModel, Field
 from playwright.async_api import async_playwright
 
-from common import CommentItem, launch_browser, get_edge_user_data, write_output, random_delay, normalize_time, wait_for_login
+from common import CommentItem, launch_browser, get_edge_user_data, write_output, random_delay, normalize_time, wait_for_login, xhs_search_by_input
 from datetime import datetime as _dt
 
 
@@ -95,11 +96,14 @@ async def scrape_profile(
                     print("\n⚠️ 检测到未登录，请在浏览器窗口中完成登录", file=sys.stderr)
                     await wait_for_login(page)
 
-            # ── 步骤 2：直接走搜索页 URL（绕过搜索框输入问题）──
+            # ── 步骤 2：模拟点击搜索框输入用户 ID ──
             print(f"步骤2: 搜索用户 {user_id}", file=sys.stderr)
-            search_url = f"https://www.xiaohongshu.com/search_result?keyword={user_id}&source=web_search_result_notes"
-            await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(3000)
+            ok = await xhs_search_by_input(page, user_id, "搜索用户")
+            if not ok:
+                print(f"  ⚠️ 搜索框输入失败，尝试回退直接URL", file=sys.stderr)
+                search_url = f"https://www.xiaohongshu.com/search_result?keyword={user_id}&source=web_search_result_notes"
+                await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+                await page.wait_for_timeout(3000)
 
             # ── 步骤 3：在搜索结果中找到对应的用户卡片 → 进入主页 ──
             print(f"步骤3: 在搜索结果中点击用户卡片", file=sys.stderr)
@@ -107,18 +111,28 @@ async def scrape_profile(
             try:
                 user_href = await page.evaluate("""
                     (targetId) => {
+                        // 优先匹配 href 中包含用户 ID 的链接
                         var links = document.querySelectorAll('a[href*="/user/profile/"]');
                         for (var link of links) {
-                            var t = (link.textContent || '');
-                            if (t.indexOf(targetId) >= 0) {
-                                return link.href;
+                            var href = link.getAttribute('href') || '';
+                            if (href.indexOf(targetId) >= 0) {
+                                return href.startsWith('http') ? href : 'https://www.xiaohongshu.com' + href;
                             }
                         }
-                        // 如果没有匹配 ID 的，取第一个看起来像品牌的用户卡片
+                        // 回退：取文本中包含品牌名/ID 的用户链接
                         for (var link of links) {
-                            var t = (link.textContent || '');
-                            if (t.indexOf('粉丝') >= 0 && t.length > 20) {
-                                return link.href;
+                            var t = (link.textContent || '').trim();
+                            if (t.length > 0 && t.indexOf('我') !== 0 && t.indexOf(targetId) >= 0) {
+                                var href = link.getAttribute('href') || '';
+                                return href.startsWith('http') ? href : 'https://www.xiaohongshu.com' + href;
+                            }
+                        }
+                        // 再回退：取第一个非"我"、非空的用户链接
+                        for (var link of links) {
+                            var t = (link.textContent || '').trim();
+                            if (t && t !== '我' && t.length > 2) {
+                                var href = link.getAttribute('href') || '';
+                                return href.startsWith('http') ? href : 'https://www.xiaohongshu.com' + href;
                             }
                         }
                         return null;
@@ -292,9 +306,17 @@ async def scrape_profile(
                 likes = item.get("likes", -1)
                 collects = item.get("collects", -1)
 
-                # ── 步骤 5：直接导航到详情页（不依赖 DOM 点击） ──
+                # ── 步骤 5：导航到详情页 ──
+                note_url = item.get("url", "")
+                # 移除可能带 profile 路径的 URL，转成标准 explore 页
+                if "/user/profile/" in note_url:
+                    note_id_match = re.search(r'/([a-f0-9]{24})', note_url)
+                    if note_id_match:
+                        note_id = note_id_match.group(1)
+                        note_url = f"https://www.xiaohongshu.com/explore/{note_id}"
+
                 try:
-                    await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                    await page.goto(note_url, wait_until="domcontentloaded", timeout=30000)
                     try:
                         await page.wait_for_load_state("networkidle", timeout=15000)
                     except Exception:
