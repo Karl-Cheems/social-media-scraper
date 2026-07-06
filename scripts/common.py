@@ -151,21 +151,38 @@ async def launch_browser(
     """安全启动浏览器。
 
     用临时目录做 persistent_context（避免 Edge User Data 锁冲突），
-    兼容旧的上层调用（返回 context, page 元组）。
+    每次用独立目录保存登录态（登录一次后不再需要重复登录）。
 
     Returns:
         (context, page) 元组
     """
-    # 保存登录态：用固定的 user_data_dir，不用临时目录
+    # 1. 创建专用于 Playwright 的独立 User Data 目录（持久化登录态）
+    pw_data_dir = os.path.join(os.path.dirname(user_data_dir), "PlaywrightUserData")
+    os.makedirs(pw_data_dir, exist_ok=True)
+
+    # 2. 关闭所有 Edge
     kill_edge()
     await asyncio.sleep(2)
 
-    # 用固定 Edge User Data 目录启动 persistent context（保留登录态）
+    # 3. 清理锁文件
+    for f in ["SingletonLock", "SingletonCookie", "SingletonSocket"]:
+        p = os.path.join(pw_data_dir, f)
+        if os.path.exists(p):
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+
+    # 4. 用独立目录启动，不干扰你的 Edge
     context = await p.chromium.launch_persistent_context(
-        user_data_dir=user_data_dir,
+        user_data_dir=pw_data_dir,
         channel="msedge",
         headless=headless,
-        args=["--disable-sync"],
+        args=[
+            "--disable-sync",
+            "--no-sandbox",
+            "--disable-gpu",
+        ],
         viewport={"width": 1920, "height": 1080},
     )
     page = context.pages[0] if context.pages else await context.new_page()

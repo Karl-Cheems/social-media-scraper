@@ -15,7 +15,7 @@ import sys
 from pydantic import BaseModel, Field
 from playwright.async_api import async_playwright
 
-from common import CommentItem, launch_browser, get_edge_user_data, write_output, random_delay, normalize_time
+from common import CommentItem, launch_browser, get_edge_user_data, write_output, random_delay, normalize_time, wait_for_login
 from datetime import datetime as _dt
 
 

@@ -643,11 +643,18 @@ class SocialMonitorGUI:
                 )
                 self.tab_processes[tab_name] = proc
 
+                for raw_line in iter(proc.stdout.readline, b""):
+                    if not raw_line:
+                        break
+                    line = raw_line.decode("utf-8", errors="replace").rstrip()
+                    if line:
+                        self._log(tab_name, line)
                 for raw_line in iter(proc.stderr.readline, b""):
                     if not raw_line:
                         break
                     line = raw_line.decode("utf-8", errors="replace").rstrip()
-                    self._log(tab_name, line)
+                    if line:
+                        self._log(tab_name, line)
                 proc.wait()
 
                 if proc.returncode != 0:
