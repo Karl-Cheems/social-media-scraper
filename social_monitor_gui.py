@@ -244,14 +244,13 @@ class SocialMonitorGUI:
     def _save_notify_config(self):
         path = self._notify_env_path()
         kv = {
-            "FEISHU_WEBHOOK": self.fs_webhook_var.get(),
-            "AGENT_URL": self.ag_url_var.get(),
+"AGENT_URL": self.ag_url_var.get(),
             "AGENT_SENDER": self.ag_sender_var.get(),
             "AGENT_CHAT": self.ag_chat_var.get(),
         }
         lines = [
             "# 飞书通知",
-            f"FEISHU_WEBHOOK={kv['FEISHU_WEBHOOK']}",
+
             "",
             "# AI Agent",
             f"AGENT_URL={kv['AGENT_URL']}",
@@ -288,8 +287,6 @@ class SocialMonitorGUI:
 
         r3 = ttk.Frame(cfg, style="Card.TLabelframe")
         r3.pack(fill="x", pady=(6, 8))
-        self.hot_fs = tk.BooleanVar(value=True)
-        ttk.Checkbutton(r3, text="发送到飞书", variable=self.hot_fs).pack(side="left", padx=(0, 12))
         self.hot_agent = tk.BooleanVar(value=True)
         ttk.Checkbutton(r3, text="发送到 AI Agent", variable=self.hot_agent).pack(side="left")
 
@@ -350,8 +347,6 @@ class SocialMonitorGUI:
 
         r3 = ttk.Frame(cfg, style="Card.TLabelframe")
         r3.pack(fill="x", pady=(6, 8))
-        self.kw_fs = tk.BooleanVar(value=True)
-        ttk.Checkbutton(r3, text="发送到飞书", variable=self.kw_fs).pack(side="left", padx=(0, 12))
         self.kw_agent = tk.BooleanVar(value=True)
         ttk.Checkbutton(r3, text="发送到 AI Agent", variable=self.kw_agent).pack(side="left")
 
@@ -461,8 +456,6 @@ class SocialMonitorGUI:
 
         r4 = ttk.Frame(cfg, style="Card.TLabelframe")
         r4.pack(fill="x", pady=(6, 8))
-        self.acc_fs = tk.BooleanVar(value=True)
-        ttk.Checkbutton(r4, text="发送到飞书", variable=self.acc_fs).pack(side="left", padx=(0, 12))
         self.acc_agent = tk.BooleanVar(value=True)
         ttk.Checkbutton(r4, text="发送到 AI Agent", variable=self.acc_agent).pack(side="left")
 
@@ -571,8 +564,7 @@ class SocialMonitorGUI:
 
         nf = self._card_frame(f, "飞书 Webhook")
         ttk.Label(nf, text="Webhook URL").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=4)
-        self.fs_webhook_var = tk.StringVar(value="")
-        ttk.Entry(nf, textvariable=self.fs_webhook_var, width=55).grid(row=0, column=1, pady=4, sticky="ew")
+
         nf.columnconfigure(1, weight=1)
 
         nf2 = self._card_frame(f, "AI Agent")
@@ -735,7 +727,7 @@ class SocialMonitorGUI:
         if visible:
             cmd.append("--visible")
 
-        self._run_script_common("hot", cmd, self.hot_fs.get(), self.hot_agent.get())
+        self._run_script_common("hot", cmd, False, self.hot_agent.get())
 
     def _toggle_all_kw(self):
         if not self.kw_checkboxes:
@@ -769,7 +761,7 @@ class SocialMonitorGUI:
         if self.kw_visible.get():
             cmd.append("--visible")
 
-        self._run_script_common("keyword", cmd, self.kw_fs.get(), self.kw_agent.get())
+        self._run_script_common("keyword", cmd, False, self.kw_agent.get())
 
     def _run_account(self):
         selected_urls = [id for _, id, var in self.acc_url_vars if var.get()]
@@ -789,7 +781,7 @@ class SocialMonitorGUI:
         if self.acc_visible.get():
             cmd.append("--visible")
 
-        self._run_script_common("account", cmd, self.acc_fs.get(), self.acc_agent.get())
+        self._run_script_common("account", cmd, False, self.acc_agent.get())
 
 
 def main():
