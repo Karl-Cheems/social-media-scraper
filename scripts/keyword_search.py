@@ -783,7 +783,7 @@ async def search_keywords(
     edge_user_data = get_edge_user_data()
 
     async with async_playwright() as p:
-        context, page = await launch_browser(
+        context, page, _tmpdir = await launch_browser(
             p, headless=headless, user_data_dir=edge_user_data, label="keyword_search"
         )
 
@@ -795,7 +795,7 @@ async def search_keywords(
                 if headless:
                     print("\n⚠️ 检测到未登录状态，将打开浏览器窗口供您登录...", file=sys.stderr)
                     await context.close()
-                    context, page = await launch_browser(
+                    context, page, _tmpdir = await launch_browser(
                         p, headless=False, user_data_dir=edge_user_data, label="keyword_search"
                     )
                     await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)

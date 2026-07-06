@@ -108,6 +108,8 @@ def kill_edge():
                 capture_output=True, timeout=10,
             )
             print("Edge 已关闭", file=sys.stderr)
+            import time as _t
+            _t.sleep(3)  # 等待进程完全退出
     except Exception:
         pass
 
@@ -146,56 +148,47 @@ async def launch_browser(
     user_data_dir: str,
     label: str = "app",
 ) -> tuple:
-    """安全启动 Edge persistent context。
+    """安全启动浏览器。
 
-    策略：
-      1. 尝试 2 次用指定 user_data_dir 启动
-      2. 遇到 TargetClosedError → kill_edge() → 重试
-      3. 最终 fallback：临时目录 + headless=False（需要手动登录）
+    用临时目录做 persistent_context（避免 Edge User Data 锁冲突），
+    兼容旧的上层调用（返回 context, page 元组）。
 
     Returns:
         (context, page) 元组
     """
+    # 先清理占用 Edge 的进程
+    kill_edge()
+    await asyncio.sleep(2)
+
+    # 用临时目录启动 persistent context
+    temp_dir = tempfile.mkdtemp(prefix=f"{label}_scraper_")
     for attempt in range(2):
         try:
-            # headless 下检测到未登录时已经在外部处理了，这里直接启动
-            # 首次启动如果 headless=True 但 Edge User Data 被占用，先 kill
             context = await p.chromium.launch_persistent_context(
-                user_data_dir=user_data_dir,
+                user_data_dir=temp_dir,
                 channel="msedge",
                 headless=headless,
                 args=["--disable-sync"],
                 viewport={"width": 1920, "height": 1080},
             )
-            page = await context.new_page()
-            return context, page
-        except Exception:  # 捕获 TargetClosedError 或权限错误
-            print(
-                f"  Edge 启动失败（attempt {attempt + 1}），正在关闭已有 Edge 进程...",
-                file=sys.stderr,
-            )
+            page = context.pages[0] if context.pages else await context.new_page()
+            return context, page, temp_dir
+        except Exception as e:
+            print(f"  Edge 启动失败（attempt {attempt+1}）: {e}", file=sys.stderr)
             kill_edge()
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)
 
-    # 最后一次尝试：用临时目录启动（需要用户手动登录）
-    print(f"  使用临时用户目录启动 Edge（将弹出登录窗口）...", file=sys.stderr)
-    temp_dir = tempfile.mkdtemp(prefix=f"{label}_scraper_")
+    # 完全回退：不用 msedge，用内置 chromium
+    print(f"  回退到内置 Chromium...", file=sys.stderr)
     try:
-        context = await p.chromium.launch_persistent_context(
-            user_data_dir=temp_dir,
-            channel="msedge",
-            headless=False,  # 临时目录无登录态，必须非无头
-            args=["--disable-sync"],
-            viewport={"width": 1920, "height": 1080},
-        )
-        page = await context.new_page()
-        print("  请在浏览器窗口中完成登录", file=sys.stderr)
-        return context, page
-    except Exception:
+        browser = await p.chromium.launch(headless=headless, args=["--disable-sync"])
+        context = await browser.new_context(viewport={"width": 1920, "height": 1080})
+        page = context.pages[0] if context.pages else await context.new_page()
+        return browser, page, temp_dir  # 兼容上层
+    except Exception as e:
         import shutil
-
         shutil.rmtree(temp_dir, ignore_errors=True)
-        raise
+        raise RuntimeError(f"浏览器启动失败: {e}")
 
 
 # ---------- Edge User Data 目录 ----------

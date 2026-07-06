@@ -74,7 +74,7 @@ async def scrape_profile(
     user_id = profile_url.rstrip('/').split('/')[-1].split('?')[0]
 
     async with async_playwright() as p:
-        context, page = await launch_browser(p, headless=headless, user_data_dir=edge_user_data, label="xiaohongshu")
+        context, page, _tmpdir = await launch_browser(p, headless=headless, user_data_dir=edge_user_data, label="xiaohongshu")
 
         try:
             # ── 步骤 1：打开 explore ──────────────────────
@@ -87,7 +87,7 @@ async def scrape_profile(
                 if headless:
                     print("\n⚠️ 检测到未登录状态，将打开浏览器窗口供您登录...", file=sys.stderr)
                     await context.close()
-                    context, page = await launch_browser(p, headless=False, user_data_dir=edge_user_data, label="xiaohongshu")
+                    context, page, _tmpdir = await launch_browser(p, headless=False, user_data_dir=edge_user_data, label="xiaohongshu")
                     await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)
                     await page.wait_for_timeout(2000)
                     await wait_for_login(page)
@@ -459,6 +459,7 @@ async def scrape_profile(
 
         finally:
             await context.close()
+            import shutil as _su; shutil.rmtree(_tmpdir, ignore_errors=True)
 
     # 笔记已在页面按发布时间从新到旧排列，保持原始顺序
     # notes.sort(key=lambda n: n.published_at, reverse=True)
