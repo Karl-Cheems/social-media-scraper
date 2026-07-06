@@ -646,10 +646,7 @@ class SocialMonitorGUI:
                 for raw_line in iter(proc.stderr.readline, b""):
                     if not raw_line:
                         break
-                    try:
-                        line = raw_line.decode("utf-8", errors="replace").rstrip()
-                    except Exception:
-                        line = raw_line.decode("gbk", errors="replace").rstrip()
+                    line = raw_line.decode("utf-8", errors="replace").rstrip()
                     self._log(tab_name, line)
                 proc.wait()
 
