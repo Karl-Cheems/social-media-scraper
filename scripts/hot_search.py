@@ -33,14 +33,13 @@ def main():
                         choices=["hot", "entertainment", "both"],
                         help="微博榜单: hot=热搜, entertainment=文娱, both=两者（默认 both）")
     parser.add_argument("--douyin-limit", type=int, default=10, help="抖音热榜数量（默认 10）")
-    parser.add_argument("--visible", action="store_true", help="显示浏览器窗口")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
 
     args = parser.parse_args()
 
     weibo_limit = args.weibo_limit
     douyin_limit = args.douyin_limit
-    headless = not args.visible
+    headless = False
 
     # 确保 scripts 目录在 sys.path 中
     scripts_dir = os.path.dirname(os.path.abspath(__file__))

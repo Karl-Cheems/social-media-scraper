@@ -45,7 +45,7 @@ DEFAULT_PROFILE_URL = "https://weibo.com/5822662089?refer_flag=1001030103_"
 async def scrape_profile(
     profile_url: str = DEFAULT_PROFILE_URL,
     limit: int = 10,
-    headless: bool = True,
+    headless: bool = False,
     fetch_comments: bool = False,
     max_comments: int = 10,
 ) -> ProfileResult:
@@ -69,19 +69,8 @@ async def scrape_profile(
                 or "微博" not in await page.title()
             )
             if login_detected:
-                if headless:
-                    print("\n⚠️ 检测到未登录状态，将打开浏览器窗口供您登录...", file=sys.stderr)
-                    print("请在浏览器窗口中完成登录后，等待脚本自动继续\n", file=sys.stderr)
-                    await context.close()
-                    context, page, _tmpdir = await launch_browser(
-                        p, headless=False, user_data_dir=edge_user_data, label="weibo_scraper"
-                    )
-                    await page.goto(profile_url, wait_until="domcontentloaded", timeout=30000)
-                    await page.wait_for_timeout(5000)
-                    await wait_for_login(page)
-                else:
-                    print("\n⚠️ 检测到未登录，请在浏览器窗口中完成登录", file=sys.stderr)
-                    await wait_for_login(page)
+                print("\n⚠️ 检测到未登录，请在浏览器窗口中完成登录", file=sys.stderr)
+                await wait_for_login(page)
 
             # 获取账号名称
             author_name = await page.evaluate(
@@ -394,7 +383,6 @@ def main():
         description="微博账号内容运营数据采集工具"
     )
     parser.add_argument("--limit", "-n", type=int, default=10, help="采集微博数量上限")
-    parser.add_argument("--visible", action="store_true", help="显示浏览器窗口（默认无头模式）")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
     parser.add_argument("--comments", action="store_true", help="同时采集评论内容")
     parser.add_argument("--max-comments", type=int, default=10, help="每条微博最多采集评论数（默认 10）")
@@ -409,7 +397,7 @@ def main():
     result = asyncio.run(scrape_profile(
         profile_url=args.url,
         limit=args.limit,
-        headless=not args.visible,
+        headless=False,
         fetch_comments=args.comments,
         max_comments=args.max_comments,
     ))

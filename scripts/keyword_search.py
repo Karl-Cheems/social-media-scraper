@@ -741,7 +741,7 @@ async def search_keywords(
     per_keyword: int = 10,
     max_comments: int = 5,
     min_interaction: int = 0,
-    headless: bool = True,
+    headless: bool = False,
 ) -> dict:
     """多关键词多平台搜索。总是进入详情页提取完整正文和评论。
     Args:
@@ -770,14 +770,7 @@ async def search_keywords(
             await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)
             await page.wait_for_timeout(2000)
             if "login" in page.url or "passport" in page.url:
-                if headless:
-                    print("\n⚠️ 检测到未登录状态，将打开浏览器窗口供您登录...", file=sys.stderr)
-                    await context.close()
-                    context, page, _tmpdir = await launch_browser(
-                        p, headless=False, user_data_dir=edge_user_data, label="keyword_search"
-                    )
-                    await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)
-                    await page.wait_for_timeout(2000)
+                print("\n⚠️ 检测到未登录，请在浏览器窗口中完成登录", file=sys.stderr)
                 await wait_for_login(page)
 
             for keyword in keywords:
@@ -885,10 +878,6 @@ def main():
         help="互动量（点赞+收藏/转发）最低阈值，低于此值则跳过该关键词（默认 0 不过滤）",
     )
     parser.add_argument(
-        "--visible", action="store_true",
-        help="显示浏览器窗口（默认无头模式）",
-    )
-    parser.add_argument(
         "--output", "-o", default=None,
         help="输出 JSON 文件路径（默认输出到 stdout）",
     )
@@ -920,7 +909,7 @@ def main():
         per_keyword=args.per_keyword,
         max_comments=args.max_comments,
         min_interaction=args.min_interaction,
-        headless=not args.visible,
+        headless=False,
     ))
 
     write_output(result, args.output)

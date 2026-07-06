@@ -63,7 +63,7 @@ DEFAULT_PROFILE_URL = (
 async def scrape_profile(
     profile_url: str = DEFAULT_PROFILE_URL,
     limit: int = 10,
-    headless: bool = True,
+    headless: bool = False,
     fetch_comments: bool = True,
     max_comments: int = 10,
     no_content: bool = False,
@@ -85,16 +85,8 @@ async def scrape_profile(
 
             # 检测登录
             if "login" in page.url or "passport" in page.url:
-                if headless:
-                    print("\n⚠️ 检测到未登录状态，将打开浏览器窗口供您登录...", file=sys.stderr)
-                    await context.close()
-                    context, page, _tmpdir = await launch_browser(p, headless=False, user_data_dir=edge_user_data, label="xiaohongshu")
-                    await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)
-                    await page.wait_for_timeout(2000)
-                    await wait_for_login(page)
-                else:
-                    print("\n⚠️ 检测到未登录，请在浏览器窗口中完成登录", file=sys.stderr)
-                    await wait_for_login(page)
+                print("\n⚠️ 检测到未登录，请在浏览器窗口中完成登录", file=sys.stderr)
+                await wait_for_login(page)
 
             # ── 步骤 2：模拟点击搜索框输入用户 ID ──
             print(f"步骤2: 搜索用户 {user_id}", file=sys.stderr)
@@ -476,7 +468,6 @@ def main():
         description="小红书账号内容运营数据采集工具"
     )
     parser.add_argument("--limit", "-n", type=int, default=10, help="采集笔记数量上限")
-    parser.add_argument("--visible", action="store_true", help="显示浏览器窗口（默认无头模式）")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
     parser.add_argument("--no-content", action="store_true", help="不获取笔记正文（默认获取）")
     parser.add_argument("--no-comments", action="store_true", help="不获取评论（默认获取）")

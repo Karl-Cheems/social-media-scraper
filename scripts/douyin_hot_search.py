@@ -34,7 +34,7 @@ HOT_SEARCH_URL = "https://www.douyin.com/hot"
 
 async def scrape_hot_search(
     limit: int = 10,
-    headless: bool = True,
+    headless: bool = False,
 ) -> list[HotItem]:
     """采集抖音热搜榜单。"""
     edge_user_data = get_edge_user_data()
@@ -134,14 +134,13 @@ def main():
         description="抖音热搜监控工具 - 采集抖音热搜榜单"
     )
     parser.add_argument("--limit", type=int, default=10, help="采集热搜数量上限（默认 10）")
-    parser.add_argument("--visible", action="store_true", help="显示浏览器窗口（默认无头模式）")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
 
     args = parser.parse_args()
 
     results = asyncio.run(scrape_hot_search(
         limit=args.limit,
-        headless=not args.visible,
+        headless=False,
     ))
 
     from datetime import datetime

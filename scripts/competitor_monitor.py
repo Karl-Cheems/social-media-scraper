@@ -48,7 +48,7 @@ def _build_profile_url(identifier: str) -> str:
 
 
 async def scrape_account(identifier: str, limit: int, fetch_comments: bool,
-                         max_comments: int, headless: bool,
+                         max_comments: int, headless: bool = False,
                          no_content: bool = False) -> dict:
     """采集单个账号的数据，返回统一格式的 dict。"""
     platform = detect_platform(identifier)
@@ -133,7 +133,6 @@ def main():
     parser.add_argument("--no-content", action="store_true", help="不获取笔记正文（小红书，默认获取）")
     parser.add_argument("--no-comments", action="store_true", help="不获取评论（默认获取）")
     parser.add_argument("--max-comments", type=int, default=10, help="每条内容最多采集评论数（默认 10）")
-    parser.add_argument("--visible", action="store_true", help="显示浏览器窗口（默认无头模式）")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
 
     args = parser.parse_args()
@@ -167,7 +166,7 @@ def main():
                     limit=args.limit,
                     fetch_comments=not args.no_comments,
                     max_comments=args.max_comments,
-                    headless=not args.visible,
+                    headless=False,
                     no_content=args.no_content,
                 )
                 results.append(account_data)
