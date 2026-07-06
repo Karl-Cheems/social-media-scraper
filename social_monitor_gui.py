@@ -649,7 +649,11 @@ class SocialMonitorGUI:
                     try:
                         line = raw_line.decode("utf-8").rstrip()
                     except UnicodeDecodeError:
-                        line = raw_line.decode("gbk", errors="replace").rstrip()
+                        try:
+                            line = raw_line.decode("gbk", errors="replace").rstrip()
+                        except UnicodeDecodeError:
+                            # 兜底：替换非法字符
+                            line = raw_line.decode("utf-8", errors="replace").rstrip()
                     self._log(tab_name, line)
                 proc.wait()
 
