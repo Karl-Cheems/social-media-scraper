@@ -125,9 +125,6 @@ async def scrape_hot_search(
 
         finally:
             await context.close()
-            import shutil as _su; shutil.rmtree(_tmpdir, ignore_errors=True)
-        import shutil as _su
-        if _tmpdir: _su.rmtree(_tmpdir, ignore_errors=True)
 
     return results
 

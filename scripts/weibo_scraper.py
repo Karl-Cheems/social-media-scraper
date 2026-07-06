@@ -381,7 +381,6 @@ async def scrape_profile(
 
         finally:
             await context.close()
-            import shutil as _su; shutil.rmtree(_tmpdir, ignore_errors=True)
 
     return ProfileResult(
         author=author_name or "元气森林官方微博",

@@ -156,39 +156,20 @@ async def launch_browser(
     Returns:
         (context, page) 元组
     """
-    # 先清理占用 Edge 的进程
+    # 保存登录态：用固定的 user_data_dir，不用临时目录
     kill_edge()
     await asyncio.sleep(2)
 
-    # 用临时目录启动 persistent context
-    temp_dir = tempfile.mkdtemp(prefix=f"{label}_scraper_")
-    for attempt in range(2):
-        try:
-            context = await p.chromium.launch_persistent_context(
-                user_data_dir=temp_dir,
-                channel="msedge",
-                headless=headless,
-                args=["--disable-sync"],
-                viewport={"width": 1920, "height": 1080},
-            )
-            page = context.pages[0] if context.pages else await context.new_page()
-            return context, page, temp_dir
-        except Exception as e:
-            print(f"  Edge 启动失败（attempt {attempt+1}）: {e}", file=sys.stderr)
-            kill_edge()
-            await asyncio.sleep(3)
-
-    # 完全回退：不用 msedge，用内置 chromium
-    print(f"  回退到内置 Chromium...", file=sys.stderr)
-    try:
-        browser = await p.chromium.launch(headless=headless, args=["--disable-sync"])
-        context = await browser.new_context(viewport={"width": 1920, "height": 1080})
-        page = context.pages[0] if context.pages else await context.new_page()
-        return browser, page, temp_dir  # 兼容上层
-    except Exception as e:
-        import shutil
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        raise RuntimeError(f"浏览器启动失败: {e}")
+    # 用固定 Edge User Data 目录启动 persistent context（保留登录态）
+    context = await p.chromium.launch_persistent_context(
+        user_data_dir=user_data_dir,
+        channel="msedge",
+        headless=headless,
+        args=["--disable-sync"],
+        viewport={"width": 1920, "height": 1080},
+    )
+    page = context.pages[0] if context.pages else await context.new_page()
+    return context, page, None  # None = 没有临时目录需要清理
 
 
 # ---------- Edge User Data 目录 ----------

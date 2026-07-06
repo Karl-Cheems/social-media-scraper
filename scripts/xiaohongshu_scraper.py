@@ -459,7 +459,6 @@ async def scrape_profile(
 
         finally:
             await context.close()
-            import shutil as _su; shutil.rmtree(_tmpdir, ignore_errors=True)
 
     # 笔记已在页面按发布时间从新到旧排列，保持原始顺序
     # notes.sort(key=lambda n: n.published_at, reverse=True)
