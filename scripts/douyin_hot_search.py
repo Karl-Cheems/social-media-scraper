@@ -40,7 +40,7 @@ async def scrape_hot_search(
     edge_user_data = get_edge_user_data()
 
     async with async_playwright() as p:
-        context, page, _tmpdir = await launch_browser(p, headless=headless, user_data_dir=edge_user_data, label="douyin")
+        context, page, _tmpdir = await launch_browser(p, headless=False, user_data_dir=edge_user_data, label="douyin")
 
         try:
             print(f"正在打开热搜榜: {HOT_SEARCH_URL}", file=sys.stderr)

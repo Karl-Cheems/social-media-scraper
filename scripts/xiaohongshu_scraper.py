@@ -74,7 +74,7 @@ async def scrape_profile(
     user_id = profile_url.rstrip('/').split('/')[-1].split('?')[0]
 
     async with async_playwright() as p:
-        context, page, _tmpdir = await launch_browser(p, headless=headless, user_data_dir=edge_user_data, label="xiaohongshu")
+        context, page, _tmpdir = await launch_browser(p, headless=False, user_data_dir=edge_user_data, label="xiaohongshu")
 
         try:
             # ── 步骤 1：打开 explore ──────────────────────

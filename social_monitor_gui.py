@@ -280,9 +280,6 @@ class SocialMonitorGUI:
         ttk.Label(r2, text="采集数量:").pack(side="left", padx=(0, 8))
         self.hot_limit = tk.StringVar(value="15")
         ttk.Spinbox(r2, from_=1, to=50, textvariable=self.hot_limit, width=6).pack(side="left", padx=(0, 24))
-        self.hot_visible = tk.BooleanVar(value=False)
-        ttk.Checkbutton(r2, text="显示浏览器", variable=self.hot_visible).pack(side="left", padx=(0, 16))
-        ttk.Label(r2, text="（无头模式遇到登录会自动弹出浏览器）", font=FONT_SM, foreground=TEXT_SECONDARY).pack(side="left", padx=(10, 0))
 
         r3 = ttk.Frame(cfg, style="Card.TLabelframe")
         r3.pack(fill="x", pady=(6, 8))
@@ -337,13 +334,10 @@ class SocialMonitorGUI:
         ttk.Checkbutton(r2, text="微博", variable=self.kw_weibo).pack(side="left", padx=(0, 12))
         self.kw_xhs = tk.BooleanVar(value=True)
         ttk.Checkbutton(r2, text="小红书", variable=self.kw_xhs).pack(side="left", padx=(0, 24))
-        self.kw_visible = tk.BooleanVar(value=False)
-        ttk.Checkbutton(r2, text="显示浏览器", variable=self.kw_visible).pack(side="left", padx=(0, 16))
         ttk.Label(r2, text="每个关键词:").pack(side="left", padx=(0, 4))
         self.kw_per = tk.StringVar(value="5")
         ttk.Spinbox(r2, from_=1, to=20, textvariable=self.kw_per, width=5).pack(side="left", padx=(0, 4))
         ttk.Label(r2, text="条  ").pack(side="left")
-        ttk.Label(r2, text="（无头模式遇到登录会自动弹出浏览器）", font=FONT_SM, foreground=TEXT_SECONDARY).pack(side="left", padx=(10, 0))
 
         r3 = ttk.Frame(cfg, style="Card.TLabelframe")
         r3.pack(fill="x", pady=(6, 8))
@@ -451,16 +445,11 @@ class SocialMonitorGUI:
         ttk.Checkbutton(r3, text="获取正文", variable=self.acc_content).pack(side="left", padx=(0, 12))
         self.acc_comment = tk.BooleanVar(value=True)
         ttk.Checkbutton(r3, text="获取评论", variable=self.acc_comment).pack(side="left", padx=(0, 12))
-        self.acc_visible = tk.BooleanVar(value=False)
-        ttk.Checkbutton(r3, text="显示浏览器", variable=self.acc_visible).pack(side="left")
 
         r4 = ttk.Frame(cfg, style="Card.TLabelframe")
         r4.pack(fill="x", pady=(6, 8))
         self.acc_agent = tk.BooleanVar(value=True)
         ttk.Checkbutton(r4, text="发送到 AI Agent", variable=self.acc_agent).pack(side="left")
-        self.acc_visible = tk.BooleanVar(value=False)
-        ttk.Checkbutton(r4, text="显示浏览器", variable=self.acc_visible).pack(side="left", padx=(10, 0))
-        ttk.Label(r4, text="（无头模式遇到登录会自动弹出浏览器）", font=FONT_SM, foreground=TEXT_SECONDARY).pack(side="left", padx=(10, 0))
 
         btnf = ttk.Frame(f, style="TFrame")
         btnf.pack(fill="x", padx=8, pady=(4, 0))
@@ -712,7 +701,6 @@ class SocialMonitorGUI:
     def _run_hot(self):
         platform = self.hot_platform.get()
         limit = self.hot_limit.get()
-        visible = self.hot_visible.get()
 
         script_map = {
             "weibo_hot": "weibo_hot_search",
@@ -732,8 +720,7 @@ class SocialMonitorGUI:
         elif platform == "merged":
             cmd += ["--weibo-limit", limit, "--douyin-limit", limit]
 
-        if visible:
-            cmd.append("--visible")
+        
 
         self._run_script_common("hot", cmd, False, self.hot_agent.get())
 
@@ -766,8 +753,6 @@ class SocialMonitorGUI:
                "--platforms", "both" if len(platforms) == 2 else platforms[0],
                "--per-keyword", self.kw_per.get()]
 
-        if self.kw_visible.get():
-            cmd.append("--visible")
 
         self._run_script_common("keyword", cmd, False, self.kw_agent.get())
 
@@ -786,8 +771,6 @@ class SocialMonitorGUI:
             cmd.append("--no-content")
         if not self.acc_comment.get():
             cmd.append("--no-comments")
-        if self.acc_visible.get():
-            cmd.append("--visible")
 
         self._run_script_common("account", cmd, False, self.acc_agent.get())
 
