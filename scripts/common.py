@@ -15,6 +15,7 @@ import json
 import os
 import random
 import re as _re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -118,28 +119,73 @@ def kill_edge():
 
 
 async def wait_for_login(page, timeout: int = 300, check_interval: float = 1.5):
-    """等待用户完成登录（检测 URL 不再包含 login/passport 关键词）。
+    """等待用户完成登录。
 
-    在非无头模式下使用，检测到未登录后打开浏览器窗口，等待用户手动登录。
-    每 1.5 秒检测一次 URL，超时时间默认 300 秒（5 分钟）。
+    每 1.5 秒检测一次页面内容，判断是否还在登录状态。
+    支持小红书和微博的登录检测。
+    超时时间默认 300 秒（5 分钟）。
 
     Args:
         page: Playwright page 对象
         timeout: 等待超时秒数（默认 300）
         check_interval: 检测间隔秒数（默认 1.5）
     """
-    print("  请在浏览器窗口中完成登录，脚本将自动继续...", file=sys.stderr)
+    print("  ⏳ 请在浏览器窗口中完成登录（扫码/输入密码），脚本将自动继续...", file=sys.stderr)
     for _ in range(int(timeout / check_interval)):
         await asyncio.sleep(check_interval)
-        current_url = page.url
-        if "login" not in current_url and "passport" not in current_url and "sso" not in current_url:
-            print("  检测到登录成功，继续执行", file=sys.stderr)
-            return True
-    print("  ⚠️ 等待登录超时，请重启工具后重试", file=sys.stderr)
+        try:
+            # 检测页面是否还在登录状态（小红书/微博的登录弹窗）
+            still_login = await page.evaluate("""() => {
+                // 检查 URL 是否在登录页
+                var url = location.href;
+                if (url.indexOf('login') >= 0 || url.indexOf('passport') >= 0) return true;
+
+                // 检查页面是否有登录弹窗/蒙层（小红书登录弹窗特征）
+                var dialog = document.querySelector('.login-dialog, [class*=login], [class*=passport], .xhs-login, .weibo-login');
+                if (dialog && dialog.offsetParent !== null) return true;
+
+                // 检查有没有登录按钮（还没登录）
+                var loginBtn = document.querySelector('[class*=login-btn], [class*=to-login]');
+                if (loginBtn && loginBtn.offsetParent !== null) return true;
+
+                // 检查是否能看到内容（说明已经登录了）
+                var feeds = document.querySelector('.feeds-page, [class*=feed], [class*=note-item], [class*=home-container]');
+                if (feeds) return false;
+
+                return false; // 默认认为已登录
+            }""")
+
+            if not still_login:
+                print("  ✅ 检测到登录成功，继续执行", file=sys.stderr)
+                return True
+        except Exception:
+            # 页面可能在加载中，忽略
+            pass
+
+    print("  ⚠️ 等待登录超时（5分钟），请重启工具后重试", file=sys.stderr)
     return False
 
 
 # ---------- 浏览器启动 ----------
+def _find_edge_exe() -> str | None:
+    """查找 Edge 可执行文件路径。"""
+    # 1) where 命令
+    try:
+        result = subprocess.run(["where", "msedge"], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            return result.stdout.strip().splitlines()[0]
+    except Exception:
+        pass
+    # 2) 常见安装路径
+    for base in [
+        os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"),
+        os.environ.get("ProgramFiles", "C:\\Program Files"),
+        os.environ.get("LOCALAPPDATA", ""),
+    ]:
+        p = os.path.join(base, "Microsoft", "Edge", "Application", "msedge.exe")
+        if os.path.isfile(p):
+            return p
+    return None
 
 
 async def launch_browser(
@@ -148,23 +194,53 @@ async def launch_browser(
     user_data_dir: str,
     label: str = "app",
 ) -> tuple:
-    """安全启动浏览器。
+    """用 CDP 连接你真实的 Edge 浏览器。
 
-    用临时目录做 persistent_context（避免 Edge User Data 锁冲突），
-    每次用独立目录保存登录态（登录一次后不再需要重复登录）。
+    启动 Edge 并开启调试端口，使用系统默认的 Default 用户配置，
+    Playwright 通过 CDP 协议连接。登录态、Cookie 全部继承。
 
     Returns:
-        (context, page) 元组
+        (context, page, edge_process) 元组
     """
-    # 1. 创建专用于 Playwright 的独立 User Data 目录（持久化登录态）
+    edge_exe = _find_edge_exe()
+    if not edge_exe:
+        raise FileNotFoundError("找不到 Edge 浏览器，请确认已安装 Microsoft Edge")
+
+    # 生成随机调试端口，避免与其他程序冲突
+    DEBUG_PORT = random.randint(10000, 60000)
+
+    # 关闭旧 Edge 进程
+    for _ in range(3):
+        try:
+            subprocess.run(["taskkill", "/f", "/t", "/im", "msedge.exe"],
+                           capture_output=True, timeout=10)
+        except Exception:
+            pass
+        await asyncio.sleep(1)
+    print("  Edge 旧进程已清理", file=sys.stderr)
+
+    # 创建独立 User Data 目录（Edge 要求必须是非默认目录才能开 CDP 调试端口）
     pw_data_dir = os.path.join(os.path.dirname(user_data_dir), "PlaywrightUserData")
-    os.makedirs(pw_data_dir, exist_ok=True)
+    real_default = os.path.join(user_data_dir, "Default")
 
-    # 2. 关闭所有 Edge
-    kill_edge()
-    await asyncio.sleep(2)
+    if not os.path.exists(pw_data_dir):
+        os.makedirs(pw_data_dir, exist_ok=True)
+        if os.path.isdir(real_default):
+            target_default = os.path.join(pw_data_dir, "Default")
+            os.makedirs(target_default, exist_ok=True)
+            for f in os.listdir(real_default):
+                src = os.path.join(real_default, f)
+                dst = os.path.join(target_default, f)
+                if os.path.isfile(src):
+                    try:
+                        shutil.copy2(src, dst)
+                    except Exception:
+                        pass
+        print("  Playwright 用户配置已初始化", file=sys.stderr)
+    else:
+        print(f"  使用已有 Playwright 配置", file=sys.stderr)
 
-    # 3. 清理锁文件
+    # 清理锁文件
     for f in ["SingletonLock", "SingletonCookie", "SingletonSocket"]:
         p2 = os.path.join(pw_data_dir, f)
         if os.path.exists(p2):
@@ -173,27 +249,64 @@ async def launch_browser(
             except Exception:
                 pass
 
-    # 4. 用独立目录启动，不干扰你的 Edge
-    context = await p.chromium.launch_persistent_context(
-        user_data_dir=pw_data_dir,
-        channel="msedge",
-        headless=headless,
-        args=[
-            "--disable-sync",
-            "--no-sandbox",
-            "--disable-gpu",
+    # 启动 Edge（用独立配置目录，这样才能开 CDP 端口）
+    edge_process = subprocess.Popen(
+        [
+            edge_exe,
+            f"--remote-debugging-port={DEBUG_PORT}",
+            "--remote-allow-origins=*",
+            f"--user-data-dir={pw_data_dir}",
         ],
-        viewport={"width": 1920, "height": 1080},
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
+    print(f"  已启动 Edge (PID={edge_process.pid})", file=sys.stderr)
+
+    # 等端口就绪
+    import socket as _socket
+    for i in range(15):
+        await asyncio.sleep(1)
+        try:
+            s = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+            s.settimeout(1)
+            if s.connect_ex(("127.0.0.1", DEBUG_PORT)) == 0:
+                s.close()
+                print(f"  Edge DevTools 就绪（+{i+1}s）", file=sys.stderr)
+                break
+            s.close()
+        except Exception:
+            pass
+    else:
+        print("  ⚠️ Edge 端口超时，尝试强行连接...", file=sys.stderr)
+
+    # CDP 连接
+    for i in range(5):
+        try:
+            browser = await p.chromium.connect_over_cdp(
+                f"http://127.0.0.1:{DEBUG_PORT}"
+            )
+            print(f"  ✅ 已连接到你的 Edge", file=sys.stderr)
+            break
+        except Exception as e:
+            if i < 4:
+                await asyncio.sleep(2)
+    else:
+        print(f"  ❌ 连接 Edge 失败（5次重试后放弃）", file=sys.stderr)
+        edge_process.kill()
+        raise RuntimeError(f"无法连接 Edge DevTools 端口 {DEBUG_PORT}")
+
+    # 取 context/page
+    context = browser.contexts[0] if browser.contexts else await browser.new_context()
     page = context.pages[0] if context.pages else await context.new_page()
-    return context, page, None  # None = 没有临时目录需要清理
+
+    return context, page, edge_process
 
 
 # ---------- 小红书搜索（模拟点击）----------
 
 async def xhs_search_by_input(page, keyword: str, label: str = ""):
     """在小红书搜索框输入关键词并搜索。
-    模拟真实用户操作：点击搜索区域 → 输入关键词 → 回车搜索。
+    模拟真实用户操作：点击搜索框 → 输入关键词 → 回车搜索。
     返回 True 如果成功导航到搜索结果页。
     """
     print(f"  🔍 搜索框输入: {keyword}", file=sys.stderr) if label else None
@@ -203,29 +316,25 @@ async def xhs_search_by_input(page, keyword: str, label: str = ""):
             await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)
             await page.wait_for_timeout(2000)
 
-        # 2. 点击搜索区域激活输入框
-        search_area = page.locator(".search-area.search-area-opacity").first
-        await search_area.wait_for(state="visible", timeout=10000)
+        # 2. 搜索框已直接可见（新版 XHS 无搜索区域遮罩层）
+        search_input = page.locator("input#search-input.search-input").first
+        await search_input.wait_for(state="visible", timeout=10000)
         await page.wait_for_timeout(random.randint(300, 800))
-        await search_area.click()
-        await page.wait_for_timeout(random.randint(800, 1200))
+        await search_input.click()
+        await page.wait_for_timeout(random.randint(500, 1000))
 
-        # 3. textarea 在 SPA 中可见性为 false，用 force=True 直接输入
-        textarea = page.locator("textarea#search-input").first
-        await page.wait_for_timeout(random.randint(200, 500))
-
-        # 4. 清空 → fill（用 force 绕过可见性检查）
-        await textarea.fill("", force=True, timeout=5000)
+        # 3. 清空 → 逐字输入
+        await search_input.fill("", timeout=5000)
         await page.wait_for_timeout(random.randint(200, 500))
         for ch in keyword:
             await page.keyboard.type(ch, delay=random.randint(50, 150))
         await page.wait_for_timeout(random.randint(800, 1500))
 
-        # 5. 回车搜索
+        # 4. 回车搜索
         await page.keyboard.press("Enter")
         await page.wait_for_timeout(3000)
 
-        # 6. 等待搜索结果加载（AI 搜索页或普通搜索页）
+        # 5. 等待搜索结果加载
         try:
             await page.wait_for_url("**/search_result**/**", timeout=15000)
         except Exception:

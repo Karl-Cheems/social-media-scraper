@@ -376,10 +376,8 @@ async def _do_xiaohongshu_search(page, keyword: str) -> bool:
     try:
         ok = await xhs_search_by_input(page, keyword, f"搜索「{keyword}」")
         if not ok:
-            print(f"    ⚠️ 搜索框输入失败，回退直接URL", file=sys.stderr)
-            search_url = f"https://www.xiaohongshu.com/search_result?keyword={quote(keyword)}&source=web_search_result_notes"
-            await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(5000)
+            print(f"    ⚠️ 搜索框输入失败，放弃搜索", file=sys.stderr)
+            return False
 
         # 验证搜索结果
         has_cards = await page.evaluate("document.querySelectorAll('section.note-item').length > 0")
@@ -722,13 +720,10 @@ async def search_xiaohongshu(page, keyword: str, per_keyword: int, max_comments:
         cc = f"({len(enriched.get('comments_list', []))}条评论)" if enriched.get("comments_list") else ""
         print(f"      [{idx+1}] {t}... 赞{lk} 收{cl} 评{cm}{cc}", file=sys.stderr)
 
-        # 返回搜索结果页（浏览器后退）
+        # 返回搜索结果页（Escape 关闭详情弹窗）
         if idx < len(items) - 1:
-            try:
-                await page.go_back(wait_until="domcontentloaded", timeout=15000)
-                await page.wait_for_timeout(3000)
-            except Exception:
-                pass
+            await page.keyboard.press("Escape")
+            await page.wait_for_timeout(2000)
 
     return items
 

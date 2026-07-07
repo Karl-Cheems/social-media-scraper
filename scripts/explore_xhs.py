@@ -8,7 +8,7 @@ from common import launch_browser, get_edge_user_data
 async def main():
     data = get_edge_user_data()
     async with async_playwright() as p:
-        c, page = await launch_browser(p, headless=False, user_data_dir=data, label="xhs")
+        c, page, _proc = await launch_browser(p, headless=False, user_data_dir=data, label="xhs")
         await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)
         await page.wait_for_timeout(5000)
         print(f"URL: {page.url}")

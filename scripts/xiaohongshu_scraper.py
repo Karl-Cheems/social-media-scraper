@@ -132,16 +132,39 @@ async def scrape_profile(
                 """, user_id)
 
                 if user_href:
-                    print(f"  进入用户主页", file=sys.stderr)
-                    # 去掉 xsec_token 参数避免过期
-                    profile_url = user_href.split('?')[0]
-                    await page.evaluate(f"window.location.href = '{profile_url}'")
+                    print(f"  点击用户卡片进入主页", file=sys.stderr)
+                    # 从 user_href 提取真实 UUID（用于点击选择器）
+                    real_uuid = user_href.rstrip('/').split('/')[-1].split('?')[0]
+                    # 用 evaluate 去掉 target，用 scrollIntoView，然后用 DOM 点击
+                    click_ok = await page.evaluate(f"""
+                        (function() {{
+                            var links = document.querySelectorAll('a[href*="/user/profile/"]');
+                            var target = null;
+                            for (var link of links) {{
+                                var href = link.getAttribute('href') || '';
+                                if (href.indexOf('{real_uuid}') >= 0) {{
+                                    target = link;
+                                    break;
+                                }}
+                            }}
+                            if (!target) return false;
+                            target.removeAttribute('target');
+                            target.scrollIntoView({{block: 'center'}});
+                            // 直接用 DOM 触发点击
+                            var evt = new MouseEvent('click', {{bubbles: true, cancelable: true, view: window}});
+                            target.dispatchEvent(evt);
+                            return true;
+                        }})();
+                    """)
+                    if not click_ok:
+                        print(f"  未找到用户卡片", file=sys.stderr)
+                        raise RuntimeError(f"未找到用户卡片")
+                    await page.wait_for_timeout(3000)
                     try:
                         await page.wait_for_url("**/user/profile/**", timeout=15000)
-                        await page.wait_for_timeout(2000)
                     except Exception:
-                        print(f"  导航超时，当前URL: {page.url}", file=sys.stderr)
-
+                        pass
+                    await page.wait_for_timeout(2000)
                     if "user/profile" not in page.url:
                         print(f"  ✗ 无法进入用户主页 {user_id}", file=sys.stderr)
                         raise RuntimeError(f"无法进入用户主页 {user_id}")
@@ -300,20 +323,35 @@ async def scrape_profile(
 
                 # ── 步骤 5：导航到详情页 ──
                 note_url = item.get("url", "")
-                # 移除可能带 profile 路径的 URL，转成标准 explore 页
+                note_id = ""
                 if "/user/profile/" in note_url:
-                    note_id_match = re.search(r'/([a-f0-9]{24})', note_url)
-                    if note_id_match:
-                        note_id = note_id_match.group(1)
-                        note_url = f"https://www.xiaohongshu.com/explore/{note_id}"
+                    # URL 格式: /user/profile/{user_id}/{note_id}?xsec_token=...
+                    note_id_match = re.findall(r'([a-f0-9]{24})', note_url)
+                    if len(note_id_match) >= 2:
+                        note_id = note_id_match[-1]  # 最后一个 = note_id
+                else:
+                    note_id = note_url.rstrip('/').split('/')[-1].split('?')[0]
 
                 try:
-                    await page.goto(note_url, wait_until="domcontentloaded", timeout=30000)
-                    try:
-                        await page.wait_for_load_state("networkidle", timeout=15000)
-                    except Exception:
-                        pass
-                    await page.wait_for_timeout(1500)
+                    card_clicked = False
+                    if note_id:
+                        # 检查页面上是否有这张卡片
+                        card = page.locator(f'section.note-item a.cover[href*="{note_id}"]').first
+                        card_on_page = await card.count() > 0 and await card.is_visible()
+                        if card_on_page:
+                            # 用点击卡片的方式进入详情页（绕过风控）
+                            await card.scroll_into_view_if_needed()
+                            await page.wait_for_timeout(300)
+                            await card.click(timeout=10000)
+                            await page.wait_for_timeout(3000)
+                            card_clicked = page.url and (f"/{note_id}" in page.url)
+
+                    if not card_clicked:
+                        # 卡片不在页面上（虚拟滚动移出）或点击失败，回退 goto
+                        explore_url = f"https://www.xiaohongshu.com/explore/{note_id}"
+                        await page.goto(explore_url, wait_until="domcontentloaded", timeout=30000)
+                        await page.wait_for_timeout(2000)
+                        card_clicked = True
 
                     # ── 提取详情页数据 ────────────────────
                     detail_data = await page.evaluate("""
@@ -416,23 +454,9 @@ async def scrape_profile(
                         url=url,
                     )
                     if idx < len(unpinned) - 1:
-                        back_ok = False
-                        for _ in range(3):
-                            try:
-                                await page.go_back(wait_until="domcontentloaded", timeout=15000)
-                                await page.wait_for_timeout(1500)
-                                if "user/profile" in page.url:
-                                    back_ok = True
-                                    break
-                            except Exception:
-                                continue
-                        if not back_ok:
-                            print(f"  返回主页失败，尝试直接导航", file=sys.stderr)
-                            try:
-                                await page.goto(profile_url, wait_until="domcontentloaded", timeout=30000)
-                                await page.wait_for_timeout(1500)
-                            except Exception as e:
-                                print(f"  导航回主页失败: {e}", file=sys.stderr)
+                        # 按 Escape 关闭详情页 SPA 浮层弹窗
+                        await page.keyboard.press("Escape")
+                        await page.wait_for_timeout(2000)
 
                 except Exception as e:
                     print(f"  详情页处理异常: {e}", file=sys.stderr)
@@ -472,6 +496,7 @@ def main():
     parser.add_argument("--no-content", action="store_true", help="不获取笔记正文（默认获取）")
     parser.add_argument("--no-comments", action="store_true", help="不获取评论（默认获取）")
     parser.add_argument("--max-comments", type=int, default=10, help="每条笔记最多采集评论数（默认 10）")
+    parser.add_argument("--visible", action="store_true", help="显示浏览器窗口（默认隐藏）")
     parser.add_argument(
         "--url",
         default=DEFAULT_PROFILE_URL,

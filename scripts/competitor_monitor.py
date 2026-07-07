@@ -134,6 +134,7 @@ def main():
     parser.add_argument("--no-comments", action="store_true", help="不获取评论（默认获取）")
     parser.add_argument("--max-comments", type=int, default=10, help="每条内容最多采集评论数（默认 10）")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
+    parser.add_argument("--visible", action="store_true", help="显示浏览器窗口（默认隐藏）")
 
     args = parser.parse_args()
 
