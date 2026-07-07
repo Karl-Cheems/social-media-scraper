@@ -99,6 +99,10 @@ class SocialMonitorGUI:
         else:
             self.keywords_file = bundle_kw
 
+        self.schedule_file = os.path.join(BASE_DIR, "schedule_rules.json")
+        self.rules = []
+        self._schedule_running = False
+
         self.tab_processes = {}
         self.tab_logs = {}
 
@@ -123,6 +127,8 @@ class SocialMonitorGUI:
         style.map("TCombobox", fieldbackground=[("readonly", CARD_BG)])
         style.configure("TSpinbox", fieldbackground=CARD_BG, foreground=TEXT, bordercolor=BORDER, borderwidth=1)
         style.configure("TCheckbutton", background=CARD_BG, foreground=TEXT)
+        style.configure("Bold.TCheckbutton", background=CARD_BG, foreground=TEXT,
+                        font=("Microsoft YaHei UI", 11, "bold"))
         style.configure("TEntry", fieldbackground=CARD_BG, foreground=TEXT, bordercolor=BORDER, borderwidth=1)
         style.configure("TLabel", background=CARD_BG, foreground=TEXT)
         style.configure("Hint.TLabel", background=CARD_BG, foreground=TEXT_SECONDARY, font=FONT_SM)
@@ -550,109 +556,393 @@ class SocialMonitorGUI:
 
     def _build_tab_schedule(self, nb):
         f = self._tab_frame(nb, "⏰ 定时任务")
-        cfg = self._card_frame(f, "定时设置")
 
-        # — 总开关 + 频率 + 时间 —
+        # 总开关
+        top_frame = ttk.Frame(f, style="TFrame")
+        top_frame.pack(fill="x", padx=8, pady=(4, 0))
+        self.sch_master_enabled = tk.BooleanVar(value=False)
+        ttk.Checkbutton(top_frame, text="开启定时轮询", variable=self.sch_master_enabled,
+                        style="Bold.TCheckbutton", command=self._on_schedule_master_toggle).pack(side="left")
+        self.sch_start_btn = ttk.Button(top_frame, text="▶  启动轮询", style="Accent.TButton",
+                                        command=self._toggle_schedule, width=14)
+        self.sch_start_btn.pack(side="right")
+        self.sch_next_label = ttk.Label(top_frame, text="", font=FONT_SM, foreground=TEXT_SECONDARY)
+        self.sch_next_label.pack(side="right", padx=(8, 0))
+
+        # ── 添加规则 ──
+        cfg = self._card_frame(f, "添加规则")
+
         r0 = ttk.Frame(cfg, style="Card.TLabelframe")
         r0.pack(fill="x", pady=(4, 0))
-        self.sch_enabled = tk.BooleanVar(value=False)
-        ttk.Checkbutton(r0, text="开启定时任务", variable=self.sch_enabled,
-                        font=("Microsoft YaHei UI", 11, "bold")).pack(side="left", padx=(0, 16))
+        ttk.Label(r0, text="规则名称:").pack(side="left", padx=(0, 4))
+        self.sch_new_name = tk.StringVar()
+        ttk.Entry(r0, textvariable=self.sch_new_name, width=20).pack(side="left", padx=(0, 16))
+        ttk.Label(r0, text="动作:").pack(side="left", padx=(0, 4))
+        self.sch_new_action = tk.StringVar(value="hot")
+        ttk.Combobox(r0, textvariable=self.sch_new_action, values=["hot", "keyword", "account"],
+                     state="readonly", width=12).pack(side="left")
+        ttk.Button(r0, text="➕ 添加规则", style="Accent.TButton",
+                   command=self._add_schedule_rule, width=12).pack(side="right", padx=(8, 0))
 
-        ttk.Label(r0, text="频率:").pack(side="left", padx=(0, 6))
-        self.sch_freq = tk.StringVar(value="daily")
-        ttk.Radiobutton(r0, text="每天", variable=self.sch_freq, value="daily").pack(side="left", padx=(0, 8))
-        ttk.Radiobutton(r0, text="每周", variable=self.sch_freq, value="weekly").pack(side="left", padx=(0, 8))
+        # 动态参数区
+        self.sch_params_frame = ttk.Frame(cfg, style="Card.TLabelframe")
+        self.sch_params_frame.pack(fill="x", pady=(2, 0))
+        self._rebuild_schedule_params()
 
-        ttk.Label(r0, text="时间:").pack(side="left", padx=(12, 4))
-        self.sch_hour = tk.StringVar(value="09")
-        self.sch_min = tk.StringVar(value="00")
-        ttk.Spinbox(r0, from_=0, to=23, textvariable=self.sch_hour, width=3, format="%02.0f").pack(side="left")
-        ttk.Label(r0, text=":").pack(side="left")
-        ttk.Spinbox(r0, from_=0, to=59, textvariable=self.sch_min, width=3, format="%02.0f").pack(side="left")
+        # 动作切换时重建参数
+        self.sch_new_action.trace_add("write", lambda *a: self._rebuild_schedule_params())
 
-        # 星期选择（每周模式）
-        self.sch_week_frame = ttk.Frame(cfg, style="Card.TLabelframe")
-        self.sch_week_frame.pack(fill="x", pady=(4, 0))
-        ttk.Label(self.sch_week_frame, text="星期:").pack(side="left", padx=(0, 6))
-        weekdays = ["一", "二", "三", "四", "五", "六", "日"]
-        self.sch_week_vars = {}
-        for w in weekdays:
-            self.sch_week_vars[w] = tk.BooleanVar(value=True)
-            ttk.Checkbutton(self.sch_week_frame, text=w, variable=self.sch_week_vars[w]).pack(side="left", padx=2)
+        # 星期 + 时间
+        r_week = ttk.Frame(cfg, style="Card.TLabelframe")
+        r_week.pack(fill="x", pady=(2, 0))
+        ttk.Label(r_week, text="星期:").pack(side="left", padx=(0, 6))
+        self.sch_new_week_vars = {}
+        weekday_names = ["一", "二", "三", "四", "五", "六", "日"]
+        for i, w in enumerate(weekday_names):
+            self.sch_new_week_vars[i] = tk.BooleanVar(value=False)
+            ttk.Checkbutton(r_week, text=w, variable=self.sch_new_week_vars[i]).pack(side="left", padx=2)
+        ttk.Label(r_week, text="  时间:").pack(side="left", padx=(12, 4))
+        self.sch_new_hour = tk.StringVar(value="09")
+        self.sch_new_min = tk.StringVar(value="00")
+        ttk.Spinbox(r_week, from_=0, to=23, textvariable=self.sch_new_hour, width=3, format="%02.0f").pack(side="left")
+        ttk.Label(r_week, text=":").pack(side="left")
+        ttk.Spinbox(r_week, from_=0, to=59, textvariable=self.sch_new_min, width=3, format="%02.0f").pack(side="left")
 
-        # — 任务选择 —
-        task_title = ttk.Label(cfg, text="选择要定时执行的任务:", font=("Microsoft YaHei UI", 10))
-        task_title.pack(fill="x", padx=8, pady=(6, 0))
+        # ── 规则列表 ──
+        list_frame = self._card_frame(f, "已设规则")
+        list_frame.pack_propagate(False)
+        self.sch_list_canvas = tk.Canvas(list_frame, bg=CARD_BG, highlightthickness=0, height=200)
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self.sch_list_canvas.yview)
+        self.sch_list_inner = ttk.Frame(self.sch_list_canvas, style="Card.TLabelframe")
+        self.sch_list_inner.bind("<Configure>",
+                                 lambda e: self.sch_list_canvas.configure(
+                                     scrollregion=self.sch_list_canvas.bbox("all")))
+        self.sch_list_canvas.create_window((0, 0), window=self.sch_list_inner, anchor="nw")
+        self.sch_list_canvas.configure(yscrollcommand=scrollbar.set)
+        self.sch_list_canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
 
-        # 热搜
-        r1 = ttk.Frame(cfg, style="Card.TLabelframe")
-        r1.pack(fill="x", pady=(2, 0))
-        self.sch_hot = tk.BooleanVar(value=True)
-        ttk.Checkbutton(r1, text="🔥 热搜", variable=self.sch_hot).pack(side="left", padx=(0, 8))
-        ttk.Label(r1, text="平台:").pack(side="left", padx=(8, 4))
-        self.sch_hot_platform = tk.StringVar(value="merged")
-        ttk.Combobox(r1, textvariable=self.sch_hot_platform,
-                     values=["weibo_hot", "weibo_ent", "douyin", "merged"],
-                     state="readonly", width=10).pack(side="left", padx=(0, 8))
-        ttk.Label(r1, text="数量:").pack(side="left", padx=(8, 4))
-        self.sch_hot_limit = tk.StringVar(value="15")
-        ttk.Spinbox(r1, from_=1, to=50, textvariable=self.sch_hot_limit, width=4).pack(side="left")
-        self.sch_hot_agent = tk.BooleanVar(value=True)
-        ttk.Checkbutton(r1, text="发送Agent", variable=self.sch_hot_agent).pack(side="right", padx=(8, 4))
-
-        # 关键词搜索
-        r2 = ttk.Frame(cfg, style="Card.TLabelframe")
-        r2.pack(fill="x", pady=(2, 0))
-        self.sch_kw = tk.BooleanVar(value=True)
-        ttk.Checkbutton(r2, text="🔍 关键词搜索", variable=self.sch_kw).pack(side="left", padx=(0, 8))
-        ttk.Label(r2, text="产品线:").pack(side="left", padx=(8, 4))
-        self.sch_kw_product = tk.StringVar(value="")
-        self.sch_kw_combo = ttk.Combobox(r2, textvariable=self.sch_kw_product, values=[], state="readonly", width=12)
-        self.sch_kw_combo.pack(side="left", padx=(0, 8))
-        ttk.Label(r2, text="数量:").pack(side="left", padx=(8, 4))
-        self.sch_kw_per = tk.StringVar(value="5")
-        ttk.Spinbox(r2, from_=1, to=20, textvariable=self.sch_kw_per, width=4).pack(side="left")
-        self.sch_kw_agent = tk.BooleanVar(value=True)
-        ttk.Checkbutton(r2, text="发送Agent", variable=self.sch_kw_agent).pack(side="right", padx=(8, 4))
-
-        # 账号监控
-        r3 = ttk.Frame(cfg, style="Card.TLabelframe")
-        r3.pack(fill="x", pady=(2, 0))
-        self.sch_acc = tk.BooleanVar(value=True)
-        ttk.Checkbutton(r3, text="📊 账号监控", variable=self.sch_acc).pack(side="left", padx=(0, 8))
-        ttk.Label(r3, text="URL文件:").pack(side="left", padx=(8, 4))
-        self.sch_acc_file = tk.StringVar(value=self.urls_file)
-        ttk.Entry(r3, textvariable=self.sch_acc_file, width=30).pack(side="left", padx=(0, 8))
-        ttk.Label(r3, text="数量:").pack(side="left", padx=(8, 4))
-        self.sch_acc_limit = tk.StringVar(value="10")
-        ttk.Spinbox(r3, from_=1, to=50, textvariable=self.sch_acc_limit, width=4).pack(side="left")
-        self.sch_acc_agent = tk.BooleanVar(value=True)
-        ttk.Checkbutton(r3, text="发送Agent", variable=self.sch_acc_agent).pack(side="right", padx=(8, 4))
-
-        # — 按钮 —
-        btnf = ttk.Frame(f, style="TFrame")
-        btnf.pack(fill="x", padx=8, pady=(4, 0))
-        self.sch_start_btn = ttk.Button(btnf, text="▶  启动定时任务", style="Accent.TButton",
-                                        command=self._toggle_schedule, width=16)
-        self.sch_start_btn.pack(side="left", padx=(0, 8))
-        ttk.Label(btnf, text="启动后每30秒检查一次，到点时自动执行",
-                  style="Hint.TLabel").pack(side="left", padx=(8, 0))
-
-        # 下次执行时间
-        self.sch_next_label = ttk.Label(f, text="", font=FONT_SM, foreground=TEXT_SECONDARY)
-        self.sch_next_label.pack(fill="x", padx=8, pady=(2, 0))
-
+        # 日志
         self._make_log_area(f, "schedule")
 
-        # 定时器线程引用
-        self._schedule_running = False
-        self._schedule_thread = None
+        # 加载规则
+        self._load_schedule_rules()
 
-        # 同步产品线
-        self.root.after(300, self._sync_schedule_products)
+    # ── 定时任务：方法 ─────────────────────────────────────
 
-    # ── Tab: ⚙️ Agent 配置 ────────────────────────────────────
+    def _rebuild_schedule_params(self):
+        """根据动作类型重建动态参数区"""
+        for w in self.sch_params_frame.winfo_children():
+            w.destroy()
+        action = self.sch_new_action.get()
+
+        if action == "hot":
+            ttk.Label(self.sch_params_frame, text="平台:").pack(side="left", padx=(0, 4))
+            self.sch_new_hot_platform = tk.StringVar(value="merged")
+            ttk.Combobox(self.sch_params_frame, textvariable=self.sch_new_hot_platform,
+                         values=["weibo_hot", "weibo_ent", "douyin", "merged"],
+                         state="readonly", width=10).pack(side="left", padx=(0, 12))
+            ttk.Label(self.sch_params_frame, text="数量:").pack(side="left", padx=(0, 4))
+            self.sch_new_hot_limit = tk.StringVar(value="15")
+            ttk.Spinbox(self.sch_params_frame, from_=1, to=50, textvariable=self.sch_new_hot_limit,
+                        width=4).pack(side="left", padx=(0, 12))
+            self.sch_new_send_agent = tk.BooleanVar(value=True)
+            ttk.Checkbutton(self.sch_params_frame, text="发Agent",
+                            variable=self.sch_new_send_agent).pack(side="left")
+
+        elif action == "keyword":
+            ttk.Label(self.sch_params_frame, text="产品线:").pack(side="left", padx=(0, 4))
+            self.sch_new_kw_product = tk.StringVar()
+            combo = ttk.Combobox(self.sch_params_frame, textvariable=self.sch_new_kw_product,
+                                 state="readonly", width=12)
+            combo.pack(side="left", padx=(0, 12))
+            if hasattr(self, '_keywords_data') and self._keywords_data:
+                names = [p["name"] for p in self._keywords_data]
+                combo["values"] = names
+                if not self.sch_new_kw_product.get():
+                    self.sch_new_kw_product.set(names[0])
+            ttk.Label(self.sch_params_frame, text="每关键词数:").pack(side="left", padx=(0, 4))
+            self.sch_new_kw_per = tk.StringVar(value="5")
+            ttk.Spinbox(self.sch_params_frame, from_=1, to=20, textvariable=self.sch_new_kw_per,
+                        width=4).pack(side="left", padx=(0, 12))
+            self.sch_new_send_agent = tk.BooleanVar(value=True)
+            ttk.Checkbutton(self.sch_params_frame, text="发Agent",
+                            variable=self.sch_new_send_agent).pack(side="left")
+
+        elif action == "account":
+            ttk.Label(self.sch_params_frame, text="URL文件:").pack(side="left", padx=(0, 4))
+            self.sch_new_acc_file = tk.StringVar(value=self.urls_file)
+            ttk.Entry(self.sch_params_frame, textvariable=self.sch_new_acc_file,
+                      width=25).pack(side="left", padx=(0, 12))
+            ttk.Label(self.sch_params_frame, text="数量:").pack(side="left", padx=(0, 4))
+            self.sch_new_acc_limit = tk.StringVar(value="10")
+            ttk.Spinbox(self.sch_params_frame, from_=1, to=50, textvariable=self.sch_new_acc_limit,
+                        width=4).pack(side="left", padx=(0, 12))
+            self.sch_new_send_agent = tk.BooleanVar(value=True)
+            ttk.Checkbutton(self.sch_params_frame, text="发Agent",
+                            variable=self.sch_new_send_agent).pack(side="left")
+
+    def _add_schedule_rule(self):
+        name = self.sch_new_name.get().strip()
+        if not name:
+            self._log("schedule", "⚠ 请输入规则名称", "orange")
+            return
+        weekdays = [i for i, var in self.sch_new_week_vars.items() if var.get()]
+        if not weekdays:
+            self._log("schedule", "⚠ 请至少勾选一个星期", "orange")
+            return
+
+        params = {}
+        action = self.sch_new_action.get()
+        if action == "hot":
+            params = {"platform": self.sch_new_hot_platform.get(), "limit": int(self.sch_new_hot_limit.get())}
+        elif action == "keyword":
+            params = {"product_line": self.sch_new_kw_product.get(), "per_keyword": int(self.sch_new_kw_per.get())}
+        elif action == "account":
+            params = {"urls_file": self.sch_new_acc_file.get(), "limit": int(self.sch_new_acc_limit.get())}
+
+        rule = {
+            "id": str(__import__("uuid").uuid4()),
+            "name": name,
+            "enabled": True,
+            "action_type": action,
+            "params": params,
+            "weekdays": weekdays,
+            "time": f"{self.sch_new_hour.get()}:{self.sch_new_min.get()}",
+            "send_agent": self.sch_new_send_agent.get(),
+        }
+        self.rules.append(rule)
+        self._save_schedule_rules()
+        self._refresh_schedule_list()
+        self._log("schedule", f"✓ 已添加规则: {name}", "green")
+        self.sch_new_name.set("")
+
+    def _refresh_schedule_list(self):
+        """刷新规则列表 UI"""
+        for w in self.sch_list_inner.winfo_children():
+            w.destroy()
+        if not self.rules:
+            ttk.Label(self.sch_list_inner, text="暂无规则，请在上方添加",
+                      style="Hint.TLabel").pack(pady=20)
+            return
+
+        weekday_names = ["一", "二", "三", "四", "五", "六", "日"]
+        action_icons = {"hot": "🔥热搜", "keyword": "🔍关键词", "account": "📊账号监控"}
+
+        for rule in self.rules:
+            row = ttk.Frame(self.sch_list_inner, style="Card.TLabelframe")
+            row.pack(fill="x", pady=2, padx=2)
+
+            # 启用开关
+            en_var = tk.BooleanVar(value=rule.get("enabled", True))
+            def _toggle_enabled(r=rule, v=en_var):
+                r["enabled"] = v.get()
+                self._save_schedule_rules()
+                self._update_next_run_label()
+            ttk.Checkbutton(row, variable=en_var, command=_toggle_enabled).pack(side="left", padx=(4, 4))
+
+            # 名称 + 动作 + 时间
+            wd_text = "".join(weekday_names[i] for i in sorted(rule.get("weekdays", [])))
+            agent_tag = "·发Agent" if rule.get("send_agent") else ""
+            info = f"{rule['name']}  {action_icons.get(rule['action_type'], '?')} {wd_text} {rule['time']}{agent_tag}"
+            ttk.Label(row, text=info, font=FONT).pack(side="left", padx=(0, 8))
+
+            # 上次执行
+            last = rule.get("last_run", "")
+            if last:
+                status = rule.get("last_status", "")
+                icon = "✓" if status == "ok" else "✗"
+                ttk.Label(row, text=f"上次:{last} {icon}", font=FONT_SM,
+                          foreground=TEXT_SECONDARY).pack(side="left", padx=(8, 0))
+
+            # 按钮
+            ttk.Button(row, text="▶", command=lambda r=rule: self._run_single_rule(r),
+                       width=3).pack(side="right", padx=2)
+            ttk.Button(row, text="🗑", command=lambda r=rule: self._delete_schedule_rule(r),
+                       width=3).pack(side="right", padx=2)
+
+    def _delete_schedule_rule(self, rule):
+        if rule in self.rules:
+            self.rules.remove(rule)
+            self._save_schedule_rules()
+            self._refresh_schedule_list()
+            self._log("schedule", f"已删除规则: {rule['name']}", "yellow")
+
+    def _run_single_rule(self, rule):
+        """立即执行一条规则"""
+        import threading as _th
+        self._log("schedule", f"▶ 立即执行: {rule['name']}", "cyan")
+        _th.Thread(target=lambda: self._execute_rule(rule), daemon=True).start()
+
+    def _on_schedule_master_toggle(self):
+        if not self.sch_master_enabled.get() and self._schedule_running:
+            self._toggle_schedule()
+
+    def _load_schedule_rules(self):
+        if os.path.isfile(self.schedule_file):
+            try:
+                with open(self.schedule_file, encoding="utf-8") as f:
+                    self.rules = json.load(f)
+            except Exception:
+                self.rules = []
+        else:
+            self.rules = []
+        self._refresh_schedule_list()
+
+    def _save_schedule_rules(self):
+        with open(self.schedule_file, "w", encoding="utf-8") as f:
+            json.dump(self.rules, f, ensure_ascii=False, indent=2)
+
+    def _toggle_schedule(self):
+        if self._schedule_running:
+            self._schedule_running = False
+            self.sch_start_btn.config(text="▶  启动轮询")
+            self.sch_next_label.config(text="")
+            self._log("schedule", "■ 定时轮询已停止", "red")
+        else:
+            self._schedule_running = True
+            self.sch_start_btn.config(text="■  停止轮询")
+            self._log("schedule", "▶ 定时轮询已启动", "green")
+            self._update_next_run_label()
+            self._schedule_loop()
+
+    def _update_next_run_label(self):
+        """计算所有规则中最近的下次执行时间"""
+        import datetime as dt
+        now = dt.datetime.now()
+        nearest = None
+        for rule in self.rules:
+            if not rule.get("enabled", False):
+                continue
+            try:
+                h, m = rule["time"].split(":")
+                hour, minute = int(h), int(m)
+            except (ValueError, KeyError):
+                continue
+            last_date = rule.get("last_run_date", "")
+            for offset in range(0, 8):
+                check = now + dt.timedelta(days=offset)
+                if check.weekday() not in rule.get("weekdays", []):
+                    continue
+                target = check.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                if target <= now:
+                    continue
+                date_str = target.strftime("%Y-%m-%d")
+                if date_str == last_date:
+                    continue
+                if nearest is None or target < nearest:
+                    nearest = target
+                break
+
+        if nearest:
+            weekday_names = ["一", "二", "三", "四", "五", "六", "日"]
+            wd = weekday_names[nearest.weekday()]
+            self.sch_next_label.config(text=f"下次执行: {nearest.strftime('%m-%d %H:%M')} ({wd})")
+        else:
+            self.sch_next_label.config(text="(无待执行规则)")
+
+    def _schedule_loop(self):
+        """每30秒检查一次是否需要执行。"""
+        if not self._schedule_running:
+            return
+        if not self.sch_master_enabled.get():
+            self.root.after(30000, self._schedule_loop)
+            return
+
+        import datetime as dt
+        now = dt.datetime.now()
+
+        for rule in self.rules:
+            if not rule.get("enabled", False):
+                continue
+            try:
+                h, m = rule["time"].split(":")
+                hour, minute = int(h), int(m)
+            except (ValueError, KeyError):
+                continue
+            if now.weekday() not in rule.get("weekdays", []):
+                continue
+            if now.hour != hour or now.minute != minute:
+                continue
+            today = now.strftime("%Y-%m-%d")
+            if rule.get("last_run_date", "") == today:
+                continue
+
+            self._log("schedule", f"\n⏰ 到达执行时间，开始: {rule['name']}", "cyan")
+            import threading as _th
+            _th.Thread(target=lambda r=rule: self._execute_rule(r), daemon=True).start()
+
+        self.root.after(30000, self._schedule_loop)
+
+    def _execute_rule(self, rule):
+        """执行单条规则"""
+        import datetime as dt
+        try:
+            action = rule["action_type"]
+            params = rule.get("params", {})
+            now_str = dt.datetime.now().strftime("%Y-%m-%d %H:%M")
+
+            cmd = None
+            if action == "hot":
+                platform = params.get("platform", "merged")
+                limit = str(params.get("limit", 15))
+                script_map = {
+                    "weibo_hot": "weibo_hot_search",
+                    "weibo_ent": "weibo_hot_search",
+                    "douyin": "douyin_hot_search",
+                    "merged": "hot_search",
+                }
+                script = script_map.get(platform, "hot_search")
+                cmd = [PYTHON, os.path.join(self.script_dir, "scripts", f"{script}.py")]
+                if platform == "weibo_hot":
+                    cmd += ["--board", "hot", "--limit", limit]
+                elif platform == "weibo_ent":
+                    cmd += ["--board", "entertainment", "--limit", limit]
+                elif platform == "douyin":
+                    cmd += ["--limit", limit]
+                elif platform == "merged":
+                    cmd += ["--weibo-limit", limit, "--douyin-limit", limit]
+
+            elif action == "keyword":
+                product = params.get("product_line", "")
+                per_kw = str(params.get("per_keyword", 5))
+                keywords = []
+                if product and hasattr(self, '_keywords_data'):
+                    pl = next((p for p in self._keywords_data if p["name"] == product), None)
+                    if pl:
+                        keywords = pl.get("keywords", [])[:5]
+                if not keywords and hasattr(self, 'kw_checkboxes'):
+                    keywords = list(self.kw_checkboxes.keys())[:3]
+                if keywords:
+                    cmd = [PYTHON, os.path.join(self.script_dir, "scripts", "keyword_search.py"),
+                           "--keywords", ",".join(keywords),
+                           "--platforms", "both",
+                           "--per-keyword", per_kw]
+
+            elif action == "account":
+                limit = str(params.get("limit", 10))
+                selected = []
+                if hasattr(self, 'acc_url_vars'):
+                    selected = [identifier for _, identifier, var in self.acc_url_vars if var.get()]
+                if selected:
+                    cmd = [PYTHON, os.path.join(self.script_dir, "scripts", "competitor_monitor.py"),
+                           "--urls"] + selected + ["--limit", limit]
+
+            if cmd:
+                self._run_script_common("schedule", cmd, False, rule.get("send_agent", True))
+                rule["last_run"] = now_str
+                rule["last_run_date"] = dt.datetime.now().strftime("%Y-%m-%d")
+                rule["last_status"] = "ok"
+            else:
+                self._log("schedule", f"  ⚠ {rule['name']}: 无可用参数，跳过", "orange")
+
+        except Exception as e:
+            self._log("schedule", f"  ✗ {rule['name']}: {e}", "red")
+            rule["last_status"] = "fail"
+
+        self._save_schedule_rules()
+        self.root.after(0, self._refresh_schedule_list)
+        self.root.after(0, self._update_next_run_label)
 
     def _build_tab_notify(self, nb):
         f = self._tab_frame(nb, "⚙️ Agent 配置")
@@ -710,164 +1000,6 @@ class SocialMonitorGUI:
             run_btn.config(state="disabled" if running else "normal")
         if stop_btn:
             stop_btn.config(state="normal" if running else "disabled")
-
-    # ── 定时任务调度 ──────────────────────────────────────
-
-    def _sync_schedule_products(self):
-        """同步关键词产品线到定时任务下拉框"""
-        if hasattr(self, 'sch_kw_combo') and hasattr(self, '_keywords_data') and self._keywords_data:
-            names = [p["name"] for p in self._keywords_data]
-            self.sch_kw_combo["values"] = names
-            if not self.sch_kw_product.get():
-                self.sch_kw_product.set(names[0])
-
-    def _toggle_schedule(self):
-        if self._schedule_running:
-            self._schedule_running = False
-            self.sch_start_btn.config(text="▶  启动定时任务")
-            self._log("schedule", "■ 定时任务已停止", "red")
-        else:
-            self._schedule_running = True
-            self.sch_start_btn.config(text="■  停止定时任务")
-            self._log("schedule", "▶ 定时任务已启动", "green")
-            self._schedule_next_time()
-            self._schedule_loop()
-
-    def _schedule_next_time(self):
-        """计算并显示下次执行时间"""
-        import datetime as dt
-        now = dt.datetime.now()
-        try:
-            hour = int(self.sch_hour.get())
-            minute = int(self.sch_min.get())
-        except ValueError:
-            self.sch_next_label.config(text="时间格式错误")
-            return
-
-        if self.sch_freq.get() == "daily":
-            target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            if target <= now:
-                target += dt.timedelta(days=1)
-            self.sch_next_label.config(
-                text=f"下次执行: {target.strftime('%Y-%m-%d %H:%M')}")
-        else:
-            weekday_map = {"一": 0, "二": 1, "三": 2, "四": 3, "五": 4, "六": 5, "日": 6}
-            for offset in range(1, 8):
-                check = now + dt.timedelta(days=offset)
-                wd_name = [k for k, v in weekday_map.items() if v == check.weekday()]
-                if wd_name and self.sch_week_vars.get(wd_name[0], tk.BooleanVar()).get():
-                    target = check.replace(hour=hour, minute=minute, second=0, microsecond=0)
-                    self.sch_next_label.config(
-                        text=f"下次执行: {target.strftime('%Y-%m-%d %H:%M')} ({wd_name[0]})")
-                    return
-            self.sch_next_label.config(text="未选择星期")
-
-    def _schedule_loop(self):
-        """每30秒检查一次是否需要执行。"""
-        if not self._schedule_running:
-            return
-
-        import datetime as dt
-        now = dt.datetime.now()
-        try:
-            hour = int(self.sch_hour.get())
-            minute = int(self.sch_min.get())
-        except ValueError:
-            self.root.after(30000, self._schedule_loop)
-            return
-
-        should_run = False
-        if self.sch_freq.get() == "daily":
-            if now.hour == hour and now.minute == minute:
-                should_run = True
-        else:
-            weekday_map = {"一": 0, "二": 1, "三": 2, "四": 3, "五": 4, "六": 5, "日": 6}
-            for name, var in self.sch_week_vars.items():
-                if var.get() and weekday_map[name] == now.weekday():
-                    if now.hour == hour and now.minute == minute:
-                        should_run = True
-                        break
-
-        if should_run and self.sch_enabled.get():
-            self._log("schedule",
-                      f"\n⏰ 到达执行时间 {now.strftime('%H:%M')}，开始执行任务...", "cyan")
-            self._execute_scheduled_tasks()
-            # 等待1分钟避免同一分钟重复触发
-            self.root.after(60000, self._schedule_loop)
-            self._schedule_next_time()
-            return
-
-        self.root.after(30000, self._schedule_loop)
-
-    def _execute_scheduled_tasks(self):
-        """执行所有已勾选的定时任务。"""
-        import threading as _th
-
-        def _run_all():
-            # 热搜
-            if self.sch_hot.get():
-                self._log("schedule", "  ▶ 执行: 热搜", "yellow")
-                platform = self.sch_hot_platform.get()
-                limit = self.sch_hot_limit.get()
-                script_map = {
-                    "weibo_hot": "weibo_hot_search",
-                    "weibo_ent": "weibo_hot_search",
-                    "douyin": "douyin_hot_search",
-                    "merged": "hot_search",
-                }
-                script = script_map.get(platform, "hot_search")
-                cmd = [PYTHON, os.path.join(self.script_dir, "scripts", f"{script}.py")]
-                if platform == "weibo_hot":
-                    cmd += ["--board", "hot", "--limit", limit]
-                elif platform == "weibo_ent":
-                    cmd += ["--board", "entertainment", "--limit", limit]
-                elif platform == "douyin":
-                    cmd += ["--limit", limit]
-                elif platform == "merged":
-                    cmd += ["--weibo-limit", limit, "--douyin-limit", limit]
-                self._run_script_common("schedule", cmd, False, self.sch_hot_agent.get())
-
-            # 关键词搜索
-            if self.sch_kw.get():
-                self._log("schedule", "  ▶ 执行: 关键词搜索", "yellow")
-                product = self.sch_kw_product.get()
-                # 从关键词 tab 当前选中获取
-                if hasattr(self, 'kw_checkboxes') and self.kw_checkboxes:
-                    keywords = [kw for kw, var in self.kw_checkboxes.items() if var.get()]
-                else:
-                    keywords = []
-                if not keywords and self._keywords_data:
-                    # 从当前产品线取前3个
-                    pl = next((p for p in self._keywords_data if p["name"] == product), None)
-                    if pl:
-                        keywords = pl.get("keywords", [])[:3]
-                if keywords:
-                    cmd = [PYTHON, os.path.join(self.script_dir, "scripts", "keyword_search.py"),
-                           "--keywords", ",".join(keywords),
-                           "--platforms", "both",
-                           "--per-keyword", self.sch_kw_per.get()]
-                    self._run_script_common("schedule", cmd, False, self.sch_kw_agent.get())
-                else:
-                    self._log("schedule", "  ⚠ 关键词搜索: 无选中关键词，跳过", "orange")
-
-            # 账号监控
-            if self.sch_acc.get():
-                self._log("schedule", "  ▶ 执行: 账号监控", "yellow")
-                # 从 url 文件加载选中项
-                selected = []
-                if hasattr(self, 'acc_url_vars'):
-                    selected = [identifier for _, identifier, var in self.acc_url_vars if var.get()]
-                if selected:
-                    cmd = [PYTHON, os.path.join(self.script_dir, "scripts", "competitor_monitor.py"),
-                           "--urls"] + selected
-                    cmd += ["--limit", self.sch_acc_limit.get()]
-                    self._run_script_common("schedule", cmd, False, self.sch_acc_agent.get())
-                else:
-                    self._log("schedule", "  ⚠ 账号监控: 未勾选监控账号，跳过", "orange")
-
-            self._log("schedule", "  ✓ 定时任务全部完成", "green")
-
-        _th.Thread(target=_run_all, daemon=True).start()
 
     def _run_script_common(self, tab_name, cmd, send_feishu, send_agent):
         self._clear_log(tab_name)
