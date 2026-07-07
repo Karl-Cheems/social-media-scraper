@@ -615,7 +615,6 @@ class SocialMonitorGUI:
         self._log(tab_name, f"▶ 开始执行: {os.path.basename(cmd[1])}", "cyan")
 
         env = os.environ.copy()
-        env["PYTHONUTF8"] = "1"
 
         tmp = tempfile.NamedTemporaryFile(
             mode="w", encoding="utf-8", suffix=".json",

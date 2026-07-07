@@ -87,7 +87,13 @@ def build_summary(data: dict, data_type: str) -> str:
         platforms = data.get("platforms", [])
         for p in platforms:
             platform = p.get("platform", "?")
-            name = "抖音" if platform == "douyin" else "微博" if platform == "weibo" else platform
+            board = p.get("board", "")
+            if platform == "weibo":
+                name = "微博热搜榜" if board == "hot" else "微博文娱榜" if board == "entertainment" else "微博"
+            elif platform == "douyin":
+                name = "抖音"
+            else:
+                name = platform
             topics = p.get("topics", [])
             lines.append(f"\n═══ {name}热榜（共{len(topics)}条）═══")
             for t in topics[:20]:
