@@ -623,22 +623,29 @@ class SocialMonitorGUI:
         tmp_path = tmp.name
         tmp.close()
 
+        # 用临时文件存日志，避免 subprocess.PIPE 内部 reader 线程解码崩溃
+        log_tmp = tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", suffix=".log",
+            delete=False, dir=self.script_dir, prefix="_gui_log_")
+        log_path = log_tmp.name
+        log_tmp.close()
+
         def work():
             try:
                 full_cmd = cmd + ["-o", tmp_path]
                 proc = subprocess.Popen(
-                    full_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    full_cmd, stdout=open(log_path, "wb"), stderr=subprocess.STDOUT,
                     cwd=self.script_dir, env=env,
                 )
                 self.tab_processes[tab_name] = proc
-
-                for raw_line in iter(proc.stdout.readline, b""):
-                    if not raw_line:
-                        break
-                    line = raw_line.decode("utf-8", errors="replace").rstrip()
-                    if line:
-                        self._log(tab_name, line)
                 proc.wait()
+
+                # 从日志文件读取输出
+                with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                    for line in f:
+                        line = line.rstrip()
+                        if line:
+                            self._log(tab_name, line)
 
                 if proc.returncode != 0:
                     self._log(tab_name, f"\n✗ 脚本异常退出 ({proc.returncode})", "red")
@@ -688,6 +695,15 @@ class SocialMonitorGUI:
                 self._log(tab_name, f"\n✗ 异常: {e}", "red")
                 self.status_var.set("❌ 出错")
             finally:
+                # 清理临时文件
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+                try:
+                    os.unlink(log_path)
+                except Exception:
+                    pass
                 self.root.after(0, lambda: self._set_tab_buttons(tab_name, running=False))
 
         threading.Thread(target=work, daemon=True).start()
