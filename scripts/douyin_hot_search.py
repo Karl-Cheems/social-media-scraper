@@ -48,7 +48,8 @@ async def scrape_hot_search(
             await page.wait_for_timeout(2000)
 
             # 抖音页面是 CSR（客户端渲染），等待热榜列表出现
-            await page.wait_for_selector("ul.Syc9_lqO", timeout=15000)
+            # 新版：ul.tUZ3t9oh > li.xqnrQ8ZV
+            await page.wait_for_selector("ul.tUZ3t9oh", timeout=15000)
 
             # 滚动到底确保全部加载
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -57,40 +58,45 @@ async def scrape_hot_search(
             # 提取热搜列表
             hot_items = await page.evaluate("""
                 () => {
-                    var items = document.querySelectorAll('ul.Syc9_lqO > li.r7SehPbm');
+                    var ul = document.querySelector('ul.tUZ3t9oh');
+                    if (!ul) return [];
+                    var items = ul.querySelectorAll(':scope > li.xqnrQ8ZV');
                     var results = [];
 
                     for (var i = 0; i < items.length; i++) {
                         var li = items[i];
-
-                        // 排名：根据序号推断（前3无数字但有特殊图标，4+有纯数字文本）
                         var rank = i + 1;
 
-                        // 标题
-                        var titleEl = li.querySelector('h3');
-                        var title = titleEl ? (titleEl.textContent || '').trim() : '';
+                        // 标题（在 .OQtNjDJ9 > a.RZuwF26I 里）
+                        var title = '';
+                        var titleLink = li.querySelector('.OQtNjDJ9 a.RZuwF26I');
+                        if (titleLink) {
+                            title = (titleLink.textContent || '').trim();
+                        }
                         if (!title) continue;
 
-                        // 热度值
-                        var hotEl = li.querySelector('.JCHbciDa');
-                        var hotValue = hotEl ? (hotEl.textContent || '').trim() : '';
+                        // 热度值（在 span.ZZFBf5Wm 里）
+                        var hotValue = '';
+                        var hotSpan = li.querySelector('span.ZZFBf5Wm');
+                        if (hotSpan) {
+                            hotValue = (hotSpan.textContent || '').trim();
+                        }
 
                         // 话题链接
-                        var linkEl = li.querySelector('a.jwmvCVIo');
                         var detailUrl = '';
-                        if (linkEl) {
-                            var href = linkEl.getAttribute('href') || '';
+                        if (titleLink) {
+                            var href = titleLink.getAttribute('href') || '';
                             if (href) {
                                 detailUrl = href.startsWith('http') ? href : 'https://www.douyin.com' + href;
                             }
                         }
 
-                        // 热度 badge
+                        // 热度 badge（前3有特殊图标）
                         var badge = '';
-                        var icons = li.querySelectorAll('.e2bt1CMS img');
-                        for (var img of icons) {
+                        var img = li.querySelector('._Q3ByIgH img');
+                        if (img) {
                             var src = img.getAttribute('src') || '';
-                            if (src.indexOf('hot_hot') >= 0) badge = '🔥';
+                            if (src.indexOf('hot_top') >= 0) badge = '🔥';
                             else if (src.indexOf('hot_new') >= 0) badge = '新';
                             else if (src.indexOf('hot_boom') >= 0) badge = '爆';
                         }
