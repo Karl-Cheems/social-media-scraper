@@ -702,7 +702,7 @@ async def _fetch_xiaohongshu_detail(page, item: dict, max_comments: int) -> dict
         comment_images = 0
         if max_comments > 0 and detail_data.get("comments", 0) > 0:
             try:
-                comments_list, comment_images = await xhs_expand_comments(page, max_comments)
+                comments_list, comment_images = await xhs_expand_comments(page, max_comments, container_scroll=True)
             except Exception as e:
                 print(f"    评论区加载异常: {e}", file=sys.stderr)
 

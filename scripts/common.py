@@ -125,12 +125,15 @@ _XHS_EXTRACT_COMMENTS_JS = """
 """
 
 
-async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80):
+async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80, container_scroll: bool = False):
     """在小红书详情页面滚动加载评论并依次点击子回复展开按钮。
 
     策略：每轮先扫当前视口的展开按钮 → btn.click() 点掉 → 检查计数 → 滚动。
-    滚动步长 600px，逐渐加大以免小步永远滚不到底。
+    滚动步长 600px。
 
+    Args:
+        container_scroll: True=滚动 .comments-container 容器（SPA弹窗详情页），
+                          False=滚动 window（独立页面详情页）
     Returns:
         (comments_list, total_comment_images) 评论列表和评论区图片总数
     """
@@ -142,7 +145,7 @@ async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80):
 
     prev_cnt = 0
     stale_rounds = 0  # 连续几轮评论数没变化
-    scroll_step = 600  # 固定步长，800 一轮滚到位
+    scroll_step = 600
 
     for _ in range(max_rounds):
         # 第一步：点展开
@@ -157,19 +160,25 @@ async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80):
         if current_cnt >= max_comments:
             break
 
-        # 第三步：检测是否卡住了（连续 5 轮无变化且无点击 → 到底了）
+        # 第三步：检测是否卡住了
         if current_cnt == prev_cnt:
             if not clicked:
                 stale_rounds += 1
                 if stale_rounds >= 5:
                     break
-            # 有展开点击但计数没变 → 点的是回复展开，继续滚动
         else:
             stale_rounds = 0
         prev_cnt = current_cnt
 
-        # 第四步：滚动（固定中大步，至少 600）
-        await page.evaluate(f"window.scrollBy(0, {scroll_step})")
+        # 第四步：滚动
+        if container_scroll:
+            # SPA 弹窗详情页：滚动 .comments-container 容器本身
+            await page.evaluate(
+                f"document.querySelector('.comments-container')?.scrollBy(0, {scroll_step})"
+            )
+        else:
+            # 独立详情页：滚动 window
+            await page.evaluate(f"window.scrollBy(0, {scroll_step})")
         await page.wait_for_timeout(600)
 
     await page.wait_for_timeout(1500)
