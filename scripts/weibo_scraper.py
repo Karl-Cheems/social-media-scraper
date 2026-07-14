@@ -240,9 +240,10 @@ async def scrape_profile(
                         if detail_nums.get("likes", -1) >= 0:
                             likes = detail_nums["likes"]
 
-                        # 多次滚动以触发评论加载（微博需鼠标定位评论区 + wheel 事件）
+                        # 多次滚动以触发评论加载（微博是用虚拟滚动，滑出的评论 DOM 被移除）
+                        # 必须一边滚动一边提取，累积去重，不能等滚动完再提取
                         if fetch_comments:
-                            # 先定位到"评论"元素，鼠标移到评论区上方
+                            # 先定位到"评论"区域
                             comment_pos = await detail_page.evaluate("""
                                 (() => {
                                     var els = document.querySelectorAll('*');
@@ -257,88 +258,65 @@ async def scrape_profile(
                                 })()
                             """)
                             await detail_page.wait_for_timeout(500)
-                            max_rounds = min(20, max(5, max_comments // 5))
-                            # 鼠标移到评论区域再 wheel（微博评论懒加载依赖 wheel 事件，window.scrollBy 无效）
+                            max_rounds = min(40, max(8, max_comments // 3))
                             if comment_pos and comment_pos['top'] > 0:
                                 await detail_page.mouse.move(comment_pos['left'] + 50, comment_pos['top'] + 10, steps=3)
-                            prev_cols = 0
+
+                            all_comments = []       # 累积的所有评论
+                            seen_content = set()    # 去重
                             stale = 0
                             for _ in range(max_rounds):
                                 await detail_page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
                                 await detail_page.wait_for_timeout(300)
-                                await detail_page.mouse.wheel(0, 200)
-                                await detail_page.wait_for_timeout(500)
-                                # 动态检测评论行数，不增长就提前结束
-                                cur = await detail_page.evaluate(
-                                    "() => document.body.innerText.split(String.fromCharCode(10)).filter(function(l){return l.indexOf(':')===0 && l.length > 2}).length"
+                                await detail_page.mouse.wheel(0, 100)
+                                await detail_page.wait_for_timeout(600)
+                                # 提取当前可见的评论
+                                batch = await detail_page.evaluate(
+                                    """() => {
+                                        var text = document.body.innerText || '';
+                                        var lines = text.split('\\n');
+                                        var start = -1;
+                                        for (var i = 0; i < lines.length; i++) {
+                                            if (lines[i] === '评论') { start = i; break; }
+                                        }
+                                        if (start < 0) return [];
+                                        // 跳过 按热度/按时间 标签
+                                        var idx = start;
+                                        while (idx < lines.length && (lines[idx] === '评论' || lines[idx] === '按热度' || lines[idx] === '按时间')) idx++;
+                                        // 解析用户:内容行
+                                        var result = [];
+                                        for (var j = idx; j < lines.length; j++) {
+                                            var l = lines[j];
+                                            if (l === '分享这条博文' || l === '已加载全部评论') break;
+                                            if (result.length > 200) break;
+                                            var next = lines[j + 1] || '';
+                                            if (next.indexOf(':') === 0 && next.length > 2 && l.indexOf(' ') < 0 && !/^\\d/.test(l)) {
+                                                result.push({
+                                                    user: l,
+                                                    content: next.substring(1).trim(),
+                                                    likes: 0
+                                                });
+                                                j++;
+                                            }
+                                        }
+                                        return result;
+                                    }"""
                                 )
-                                if cur > prev_cols:
+                                new_count = 0
+                                for c in batch:
+                                    key = c.get('content', '')[:40]
+                                    if key and key not in seen_content:
+                                        seen_content.add(key)
+                                        all_comments.append(c)
+                                        new_count += 1
+                                if new_count > 0:
                                     stale = 0
-                                    prev_cols = cur
                                 else:
                                     stale += 1
-                                    if stale >= 3:
+                                    if stale >= 4:
                                         break
 
-                            comments_list = await detail_page.evaluate(
-                                """(maxC) => {
-                                    var text = document.body.innerText || '';
-                                    var lines = text.split('\\n').filter(function(l){return l.trim()});
-
-                                    var commentStart = -1;
-                                    for (var i = 0; i < lines.length; i++) {
-                                        if (lines[i] === '评论') { commentStart = i + 1; break; }
-                                    }
-                                    if (commentStart < 0) return [];
-
-                                    var idx = commentStart;
-                                    while (idx < lines.length && (lines[idx] === '按热度' || lines[idx] === '按时间')) idx++;
-                                    // 跳过空行找到第一个用户名（非数字、非日期、非空的行）
-                                    while (idx < lines.length) {
-                                        var l = lines[idx];
-                                        if (/^\\d{1,2}-\\d{1,2}/.test(l) || /^\\d{1,2}月/.test(l) || l.indexOf('发布于') >= 0 || l.indexOf('来自') >= 0 || /^\\d+$/.test(l)) {
-                                            idx++;
-                                        } else { break; }
-                                    }
-
-                                    var result = [];
-                                    var pendingUser = '';
-                                    var pendingContent = '';
-                                    var inContent = false;
-                                    for (var j = idx; j < lines.length; j++) {
-                                        var l = lines[j];
-                                        if (l === '已加载全部评论' || l === '分享这条博文') break;
-                                        if (result.length >= maxC) break;
-
-                                        if (l.indexOf(':') === 0) {
-                                            pendingContent = l.substring(1).trim();
-                                            inContent = true;
-                                        } else if (/^\\d{1,2}-\\d{1,2}-\\d{1,2}/.test(l) || l.indexOf('发布于') >= 0 || l.indexOf('来自') >= 0) {
-                                            if (inContent) {
-                                                result.push({ user: pendingUser || '(未知)', content: pendingContent || '', likes: 0 });
-                                                pendingUser = '';
-                                                pendingContent = '';
-                                                inContent = false;
-                                            }
-                                        } else if (/^\\d+$/.test(l)) {
-                                        } else {
-                                            if (inContent) {
-                                                result.push({ user: pendingUser || '(未知)', content: pendingContent || '', likes: 0 });
-                                                pendingUser = '';
-                                                pendingContent = '';
-                                            }
-                                            pendingUser = l;
-                                            pendingContent = '';
-                                            inContent = false;
-                                        }
-                                    }
-                                    if (pendingUser && inContent) {
-                                        result.push({ user: pendingUser, content: pendingContent || '', likes: 0 });
-                                    }
-                                    return result;
-                                }""",
-                                max_comments
-                            )
+                            comments_list = all_comments[:max_comments]
 
                         if detail_url:
                             pub_time = await detail_page.evaluate("""
