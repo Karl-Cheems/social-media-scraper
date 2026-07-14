@@ -18,6 +18,10 @@ import json
 import os
 import random
 import sys
+# ── 路径修补 ──
+_scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
 import time
 from datetime import datetime
 

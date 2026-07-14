@@ -13,11 +13,15 @@ import asyncio
 import json
 import os
 import sys
+# ── 路径修补 ──
+_scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
 
 from pydantic import BaseModel, Field
 from playwright.async_api import async_playwright
 
-from common import CommentItem, kill_edge, launch_browser, get_edge_user_data, write_output, random_delay, normalize_time, wait_for_login
+from common import CommentItem, flatten_comments, kill_edge, launch_browser, get_edge_user_data, write_output, random_delay, normalize_time, wait_for_login
 
 
 class WeiboEngagement(BaseModel):
@@ -196,40 +200,14 @@ async def scrape_profile(
                 comments_list = []
 
                 if detail_url:
+                    # 在新 tab 中打开详情页，提取完自动关闭
+                    detail_page = await context.new_page()
                     try:
-                        # 在账号主页找到对应的 article 并点击时间链接（SPA 内部导航）
-                        clicked = await page.evaluate("""
-                        (targetUrl) => {
-                            var arts = document.querySelectorAll('article');
-                            for (var a of arts) {
-                                var timeLink = a.querySelector('[class*=_time_]');
-                                if (!timeLink) continue;
-                                var href = timeLink.getAttribute('href') || '';
-                                if (!href.startsWith('http')) href = 'https:' + href;
-                                if (href === targetUrl || href.split('?')[0] === targetUrl.split('?')[0]) {
-                                    var evt = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
-                                    timeLink.dispatchEvent(evt);
-                                    return true;
-                                }
-                            }
-                            return false;
-                        }
-                        """, detail_url)
-
-                        if not clicked:
-                            print(f"  未找到可点击的卡片，回退到 goto", file=sys.stderr)
-                            await page.goto(detail_url, wait_until="domcontentloaded", timeout=30000)
-                            await page.wait_for_timeout(2000)
-                        else:
-                            # 等待 SPA 导航到详情页
-                            try:
-                                await page.wait_for_url("**/detail/**", timeout=10000)
-                            except Exception:
-                                pass
-                            await page.wait_for_timeout(2000)
+                        await detail_page.goto(detail_url, wait_until="domcontentloaded", timeout=30000)
+                        await detail_page.wait_for_timeout(3000)
 
                         # 从详情页提取完整正文
-                        full_text = await page.evaluate("""
+                        full_text = await detail_page.evaluate("""
                             () => {
                                 var candidates = document.querySelectorAll(
                                     '[class*=_ogText_], [class*=_text_], [class*=_wbtext_]'
@@ -244,7 +222,7 @@ async def scrape_profile(
                         """)
 
                         # 在详情页重新提取互动数据（比列表页更准确）
-                        detail_nums = await page.evaluate("""
+                        detail_nums = await detail_page.evaluate("""
                             () => {
                                 var all = document.body.innerText || '';
                                 var r = { reposts: -1, comments: -1, likes: -1 };
@@ -264,11 +242,12 @@ async def scrape_profile(
 
                         # 多次滚动以触发评论加载
                         if fetch_comments:
-                            for _ in range(3):
-                                await page.evaluate("window.scrollBy(0, 1500)")
-                                await page.wait_for_timeout(800)
+                            scroll_rounds = min(30, max(5, max_comments // 4))
+                            for _ in range(scroll_rounds):
+                                await detail_page.evaluate("window.scrollBy(0, 1500)")
+                                await detail_page.wait_for_timeout(800)
 
-                            comments_list = await page.evaluate(
+                            comments_list = await detail_page.evaluate(
                                 """(maxC) => {
                                     var text = document.body.innerText || '';
                                     var lines = text.split('\\n').filter(function(l){return l.trim()});
@@ -322,32 +301,24 @@ async def scrape_profile(
                                 }""",
                                 max_comments
                             )
+
+                        if detail_url:
+                            pub_time = await detail_page.evaluate("""
+                                () => {
+                                    var el = document.querySelector('time, [datetime], [class*=_time_]');
+                                    return el ? (el.textContent || el.getAttribute('datetime') || '').trim() : '';
+                                }
+                            """)
                     except Exception as e:
                         print(f"  [{idx+1}] 详情页异常: {e}", file=sys.stderr)
-
-                # 返回账号主页供下一次点击
-                if idx < len(weibo_data) - 1:
-                    for _ in range(3):
-                        try:
-                            await page.go_back(wait_until="domcontentloaded", timeout=15000)
-                            await page.wait_for_timeout(1500)
-                            if "weibo.com" in page.url and "detail" not in page.url:
-                                break
-                        except Exception:
-                            continue
+                    finally:
+                        await detail_page.close()
 
                 # 如果没有取到详情页完整文本，回退到首页截断文本
                 if not full_text:
                     full_text = (item.get("text", "") or "")[:300]
 
                 pub_time = item.get("pubTime", "") or ""
-                if not pub_time and detail_url:
-                    pub_time = await page.evaluate("""
-                        () => {
-                            var el = document.querySelector('time, [datetime], [class*=_time_]');
-                            return el ? (el.textContent || el.getAttribute('datetime') || '').trim() : '';
-                        }
-                    """)
                 pub_time = normalize_time(pub_time)
 
                 weibo = WeiboEngagement(
@@ -385,7 +356,7 @@ def main():
     parser.add_argument("--limit", "-n", type=int, default=10, help="采集微博数量上限")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
     parser.add_argument("--comments", action="store_true", help="同时采集评论内容")
-    parser.add_argument("--max-comments", type=int, default=10, help="每条微博最多采集评论数（默认 10）")
+    parser.add_argument("--max-comments", type=int, default=60, help="每条微博最多采集评论数（默认 60）")
     parser.add_argument(
         "--url",
         default=DEFAULT_PROFILE_URL,
@@ -403,6 +374,11 @@ def main():
     ))
 
     output = result.model_dump(mode="json")
+    # 压平评论为纯文本
+    for w in output.get("weibos", []):
+        if "comments_list" in w:
+            w["comments_text"] = flatten_comments(w["comments_list"])
+            del w["comments_list"]
 
     write_output(output, args.output)
 

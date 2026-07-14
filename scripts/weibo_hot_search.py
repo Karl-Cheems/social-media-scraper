@@ -14,6 +14,10 @@ import json
 import os
 import re
 import sys
+# ── 路径修补 ──
+_scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
 
 from pydantic import BaseModel, Field
 from playwright.async_api import async_playwright
@@ -96,9 +100,12 @@ async def scrape_hot_search(
                         if (isNaN(rank) || rank < 1 || rank > 100) {
                             // 备选：从文本开头提取数字
                             var m = txt.match(/^(\\d+)/);
-                            if (!m) continue;
-                            rank = parseInt(m[1], 10);
-                            if (rank < 1 || rank > 100) continue;
+                            if (m) {
+                                rank = parseInt(m[1], 10);
+                            } else {
+                                // 兜底：用 DOM 顺序索引
+                                rank = i + 1;
+                            }
                         }
 
                         // 提取标题：去掉排名数字前缀（用已知的 rank 精确截取）

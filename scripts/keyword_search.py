@@ -221,9 +221,11 @@ async def _fetch_weibo_detail(page, item: dict, max_comments: int) -> dict:
         # 提取评论
         comments_list = []
         if max_comments > 0:
-            for _ in range(3):
+            # 多次滚动触发懒加载
+            scroll_rounds = min(30, max(5, max_comments // 4))
+            for _ in range(scroll_rounds):
                 await page.evaluate("window.scrollBy(0, 1500)")
-                await page.wait_for_timeout(1500)
+                await page.wait_for_timeout(800)
 
             comments_list = await page.evaluate(
                 """(maxC) => {
@@ -238,8 +240,13 @@ async def _fetch_weibo_detail(page, item: dict, max_comments: int) -> dict:
 
                     var idx = commentStart;
                     while (idx < lines.length && (lines[idx] === '按热度' || lines[idx] === '按时间')) idx++;
-
-                    idx += 4;
+                    // 跳过空行找到第一个用户名（非数字、非日期、非空的行）
+                    while (idx < lines.length) {
+                        var l = lines[idx];
+                        if (/^\d{1,2}-\d{1,2}/.test(l) || /^\d{1,2}月/.test(l) || l.indexOf('发布于') >= 0 || l.indexOf('来自') >= 0 || /^\d+$/.test(l)) {
+                            idx++;
+                        } else { break; }
+                    }
 
                     var result = [];
                     var pendingUser = '';

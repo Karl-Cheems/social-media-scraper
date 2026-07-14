@@ -14,6 +14,10 @@ import json
 import os
 import re
 import sys
+# ── 路径修补：PyInstaller exe 内子进程需要找到 common.py ──
+_scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
 
 from pydantic import BaseModel, Field
 from playwright.async_api import async_playwright

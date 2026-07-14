@@ -172,14 +172,26 @@ async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80, con
 
         # 第四步：滚动
         if container_scroll:
-            # SPA 弹窗详情页：滚动 .comments-container 容器本身
-            await page.evaluate(
-                f"document.querySelector('.comments-container')?.scrollBy(0, {scroll_step})"
-            )
+            # SPA 弹窗详情页（keyword_search/xiaohongshu_scraper模式）
+            # 注意：.comments-container 是 overflow-y: visible，对它 scrollBy 无效
+            # 真正的可滚动容器是 .note-scroller (overflow-y: scroll)
+            # 先把最后一条 parent-comment 滚到视口底部，再微调触发懒加载
+            await page.evaluate(f"""
+                (() => {{
+                    var items = document.querySelectorAll('.note-scroller .parent-comment');
+                    if (items.length > 0) {{
+                        items[items.length - 1].scrollIntoView({{block: 'end'}});
+                    }}
+                    var ns = document.querySelector('.note-scroller');
+                    if (ns) ns.scrollBy(0, {scroll_step});
+                    // fallback: 尝试 mouse wheel 模拟
+                    if (!ns) window.scrollBy(0, {scroll_step});
+                }})()
+            """)
         else:
-            # 独立详情页：滚动 window
+            # 独立详情页（url_detail 模式）：直接滚动 window
             await page.evaluate(f"window.scrollBy(0, {scroll_step})")
-        await page.wait_for_timeout(600)
+        await page.wait_for_timeout(800)
 
     await page.wait_for_timeout(1500)
     result = await page.evaluate(_XHS_EXTRACT_COMMENTS_JS, max_comments)
