@@ -142,7 +142,7 @@ async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80):
 
     prev_cnt = 0
     stale_rounds = 0  # 连续几轮评论数没变化
-    scroll_step = 400  # 起始步长，逐步加大
+    scroll_step = 600  # 固定步长，800 一轮滚到位
 
     for _ in range(max_rounds):
         # 第一步：点展开
@@ -157,19 +157,19 @@ async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80):
         if current_cnt >= max_comments:
             break
 
-        # 第三步：检测是否卡住了
-        if current_cnt == prev_cnt and not clicked:
-            stale_rounds += 1
-            # 如果已经滚了很多轮都无变化 → 到底了
-            if stale_rounds >= 10:
-                break
+        # 第三步：检测是否卡住了（连续 5 轮无变化且无点击 → 到底了）
+        if current_cnt == prev_cnt:
+            if not clicked:
+                stale_rounds += 1
+                if stale_rounds >= 5:
+                    break
+            # 有展开点击但计数没变 → 点的是回复展开，继续滚动
         else:
             stale_rounds = 0
         prev_cnt = current_cnt
 
-        # 第四步：滚动（步长递增，更快触底）
-        await page.mouse.wheel(0, scroll_step)
-        scroll_step = min(scroll_step + 50, 800)
+        # 第四步：滚动（固定中大步，至少 600）
+        await page.evaluate(f"window.scrollBy(0, {scroll_step})")
         await page.wait_for_timeout(600)
 
     await page.wait_for_timeout(1500)
