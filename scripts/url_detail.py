@@ -176,95 +176,149 @@ async def _scrape_xhs_url(page, context, url: str, max_comments: int) -> dict:
 async def _scrape_weibo_url(page, context, url: str, max_comments: int) -> dict:
     print("  平台: 微博", file=sys.stderr)
 
-    await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-    await page.wait_for_timeout(5000)
+    # 在新 tab 中打开详情页（保持主 tab 干净）
+    detail_page = await context.new_page()
+    try:
+        await detail_page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        await detail_page.wait_for_timeout(5000)
 
-    # 检测登录
-    if "login" in page.url or "passport" in page.url:
-        print("\n⚠️ 检测到未登录，请在浏览器窗口中完成登录", file=sys.stderr)
-        await wait_for_login(page)
+        # 检测登录
+        if "login" in detail_page.url or "passport" in detail_page.url:
+            print("\n⚠️ 检测到未登录，请在浏览器窗口中完成登录", file=sys.stderr)
+            await wait_for_login(detail_page)
 
-    # 提取正文和互动量
-    detail = await page.evaluate("""
-    () => {
-        var r = { text: '', reposts: -1, comments: -1, likes: -1, author: '' };
+        # 提取正文和互动量（使用 weibo_scraper 验证过的选择器）
+        detail = await detail_page.evaluate("""
+        () => {
+            var r = { text: '', reposts: -1, comments: -1, likes: -1, author: '' };
 
-        // 正文
-        var candidates = document.querySelectorAll('[class*=_ogText_], [class*=_text_], [class*=_wbtext_], .WB_text, [node-type="text"]');
-        var best = '';
-        for (var el of candidates) {
-            var t = (el.textContent || '').trim();
-            if (t.length > best.length) best = t;
-        }
-        r.text = best;
-
-        // 作者
-        var ael = document.querySelector('[class*=name] span, [class*=nick] span, [class*=_name_]');
-        if (ael) r.author = ael.textContent.trim();
-
-        // 互动
-        var all = document.body.innerText || '';
-        var m;
-        m = all.match(/转发[\\s\\S]{0,3}([\\d,]*)/); if (m) r.reposts = parseInt(m[1].replace(/,/g,''), 10);
-        m = all.match(/评论[\\s\\S]{0,3}([\\d,]*)/); if (m) r.comments = parseInt(m[1].replace(/,/g,''), 10);
-        m = all.match(/赞[\\s\\S]{0,3}([\\d,]*)/); if (m) r.likes = parseInt(m[1].replace(/,/g,''), 10);
-
-        return r;
-    }
-    """)
-
-    print(f"  正文: {len(detail.get('text',''))} 字", file=sys.stderr)
-    print(f"  互动: 转={detail.get('reposts',-1)} 评={detail.get('comments',-1)} 赞={detail.get('likes',-1)}", file=sys.stderr)
-
-    # 评论
-    comments_list = []
-    if max_comments > 0:
-        for _ in range(min(30, max(5, max_comments // 4))):
-            await page.evaluate("window.scrollBy(0, 1500)")
-            await page.wait_for_timeout(800)
-
-        comments_list = await page.evaluate("""
-        (maxC) => {
-            var text = document.body.innerText || '';
-            var lines = text.split('\\n').filter(function(l){return l.trim()});
-            var cs = -1;
-            for (var i = 0; i < lines.length; i++) {
-                if (lines[i] === '评论') { cs = i + 1; break; }
+            // 正文
+            var candidates = document.querySelectorAll(
+                '[class*=_ogText_], [class*=_text_], [class*=_wbtext_]'
+            );
+            var best = '';
+            for (var el of candidates) {
+                var t = (el.textContent || '').trim();
+                if (t.length > best.length) best = t;
             }
-            if (cs < 0) return [];
-            var idx = cs;
-            while (idx < lines.length && (lines[idx] === '按热度' || lines[idx] === '按时间')) idx++;
-            idx += 4;
-            var r = [], pu = '', pc = '', ic = false;
-            for (var j = idx; j < lines.length; j++) {
-                var l = lines[j];
-                if (l === '已加载全部评论' || l === '分享这条博文' || l === '分享这条微博') break;
-                if (r.length >= maxC) break;
-                if (l.indexOf(':') === 0) { pc = l.substring(1).trim(); ic = true; }
-                else if (/^\\d{1,2}-\\d{1,2}-\\d{1,2}/.test(l) || l.indexOf('发布于') >= 0 || l.indexOf('来自') >= 0) {
-                    if (ic) { r.push({user: pu || '(未知)', content: pc || '', likes: 0, replies: []}); pu = ''; pc = ''; ic = false; }
-                } else if (/^\\d+$/.test(l)) {} else {
-                    if (ic) { r.push({user: pu || '(未知)', content: pc || '', likes: 0, replies: []}); pu = ''; pc = ''; }
-                    pu = l; pc = ''; ic = false;
+            r.text = best;
+
+            // 作者
+            var ael = document.querySelector('[class*=name] span, [class*=nick] span, [class*=_name_]');
+            if (ael) r.author = ael.textContent.trim();
+
+            // 互动（用 weibo_scraper 已验证的 footer 选择器 + innerText 回退）
+            var footer = document.querySelector('footer');
+            if (footer) {
+                var numEls = footer.querySelectorAll('[class*=_num_]');
+                var nums = [];
+                for (var j = 0; j < numEls.length; j++) {
+                    var t = numEls[j].textContent.trim();
+                    if (!t || t === '转发' || t === '评论' || t === '赞') continue;
+                    var n = parseInt(t.replace(/,/g, ''), 10);
+                    if (isNaN(n) || n < 0) continue;
+                    nums.push(n);
+                }
+                if (nums.length >= 1) r.reposts = nums[0];
+                if (nums.length >= 2) r.comments = nums[1];
+                var likeEl = footer.querySelector('[class*=woo-like-count]');
+                if (likeEl) {
+                    var lt = likeEl.textContent.trim();
+                    if (lt) { var ln = parseInt(lt.replace(/,/g, ''), 10); if (!isNaN(ln)) r.likes = ln; }
                 }
             }
-            if (pu && ic) r.push({user: pu, content: pc || '', likes: 0, replies: []});
+            // innerText 回退
+            if (r.reposts < 0 || r.comments < 0 || r.likes < 0) {
+                var all = document.body.innerText || '';
+                var m;
+                if (r.reposts < 0) { m = all.match(/转发[\\s\\S]{0,3}([\\d,]*)/); if (m) r.reposts = parseInt(m[1].replace(/,/g,''), 10); }
+                if (r.comments < 0) { m = all.match(/评论[\\s\\S]{0,3}([\\d,]*)/); if (m) r.comments = parseInt(m[1].replace(/,/g,''), 10); }
+                if (r.likes < 0) { m = all.match(/赞[\\s\\S]{0,3}([\\d,]*)/); if (m) r.likes = parseInt(m[1].replace(/,/g,''), 10); }
+            }
+
             return r;
         }
-        """, max_comments)
+        """)
 
-    print(f"  评论: {len(comments_list)} 条", file=sys.stderr)
+        print(f"  正文: {len(detail.get('text',''))} 字", file=sys.stderr)
+        print(f"  互动: 转={detail.get('reposts',-1)} 评={detail.get('comments',-1)} 赞={detail.get('likes',-1)}", file=sys.stderr)
 
-    return {
-        "platform": "weibo",
-        "url": url,
-        "text": detail.get("text", ""),
-        "author": detail.get("author", ""),
-        "reposts": detail.get("reposts", -1),
-        "comments": detail.get("comments", -1),
-        "likes": detail.get("likes", -1),
-        "comments_text": flatten_comments(comments_list),
-    }
+        # 评论
+        comments_list = []
+        if max_comments > 0:
+            scroll_rounds = min(30, max(5, max_comments // 4))
+            for _ in range(scroll_rounds):
+                await detail_page.evaluate("window.scrollBy(0, 1500)")
+                await detail_page.wait_for_timeout(800)
+
+            comments_list = await detail_page.evaluate("""
+            (maxC) => {
+                var text = document.body.innerText || '';
+                var lines = text.split('\\n').filter(function(l){return l.trim()});
+
+                var commentStart = -1;
+                for (var i = 0; i < lines.length; i++) {
+                    if (lines[i] === '评论') { commentStart = i + 1; break; }
+                }
+                if (commentStart < 0) return [];
+
+                var idx = commentStart;
+                while (idx < lines.length && (lines[idx] === '按热度' || lines[idx] === '按时间')) idx++;
+
+                idx += 4;
+
+                var result = [];
+                var pendingUser = '';
+                var pendingContent = '';
+                var inContent = false;
+                for (var j = idx; j < lines.length; j++) {
+                    var l = lines[j];
+                    if (l === '已加载全部评论' || l === '分享这条博文') break;
+                    if (result.length >= maxC) break;
+
+                    if (l.indexOf(':') === 0) {
+                        pendingContent = l.substring(1).trim();
+                        inContent = true;
+                    } else if (/^\\d{1,2}-\\d{1,2}-\\d{1,2}/.test(l) || l.indexOf('发布于') >= 0 || l.indexOf('来自') >= 0) {
+                        if (inContent) {
+                            result.push({ user: pendingUser || '(未知)', content: pendingContent || '', likes: 0 });
+                            pendingUser = '';
+                            pendingContent = '';
+                            inContent = false;
+                        }
+                    } else if (/^\\d+$/.test(l)) {
+                    } else {
+                        if (inContent) {
+                            result.push({ user: pendingUser || '(未知)', content: pendingContent || '', likes: 0 });
+                            pendingUser = '';
+                            pendingContent = '';
+                        }
+                        pendingUser = l;
+                        pendingContent = '';
+                        inContent = false;
+                    }
+                }
+                if (pendingUser && inContent) {
+                    result.push({ user: pendingUser, content: pendingContent || '', likes: 0 });
+                }
+                return result;
+            }
+            """, max_comments)
+
+        print(f"  评论: {len(comments_list)} 条", file=sys.stderr)
+
+        return {
+            "platform": "weibo",
+            "url": url,
+            "text": detail.get("text", ""),
+            "author": detail.get("author", ""),
+            "reposts": detail.get("reposts", -1),
+            "comments": detail.get("comments", -1),
+            "likes": detail.get("likes", -1),
+            "comments_text": flatten_comments(comments_list),
+        }
+    finally:
+        await detail_page.close()
 
 
 def main():
