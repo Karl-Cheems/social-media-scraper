@@ -181,8 +181,8 @@ async def _scrape_weibo_url(page, context, url: str, max_comments: int) -> dict:
     try:
         # 去掉 URL 中的 #repost/#comment 等 hash 片段，确保进入正常详情页
         clean_url = url.split('#')[0]
-        await detail_page.goto(clean_url, wait_until="domcontentloaded", timeout=30000)
-        await detail_page.wait_for_timeout(5000)
+        await detail_page.goto(clean_url, wait_until="domcontentloaded", timeout=20000)
+        await page.wait_for_timeout(3000)
 
         # 检测登录
         if "login" in detail_page.url or "passport" in detail_page.url:
