@@ -258,7 +258,7 @@ async def scrape_profile(
                                 })()
                             """)
                             await detail_page.wait_for_timeout(500)
-                            max_rounds = min(40, max(8, max_comments // 3))
+                            max_rounds = min(50, max(10, max_comments // 2))
                             if comment_pos and comment_pos['top'] > 0:
                                 await detail_page.mouse.move(comment_pos['left'] + 50, comment_pos['top'] + 10, steps=3)
 
@@ -266,10 +266,13 @@ async def scrape_profile(
                             seen_content = set()    # 去重
                             stale = 0
                             for _ in range(max_rounds):
+                                # scrollTo 到底 + 多次 wheel 确保触发懒加载
                                 await detail_page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                                await detail_page.wait_for_timeout(400)
+                                await detail_page.mouse.wheel(0, 100)
                                 await detail_page.wait_for_timeout(300)
                                 await detail_page.mouse.wheel(0, 100)
-                                await detail_page.wait_for_timeout(600)
+                                await detail_page.wait_for_timeout(500)
                                 # 提取当前可见的评论
                                 batch = await detail_page.evaluate(
                                     """() => {
@@ -311,6 +314,8 @@ async def scrape_profile(
                                         new_count += 1
                                 if new_count > 0:
                                     stale = 0
+                                    if len(all_comments) >= max_comments:
+                                        break
                                 else:
                                     stale += 1
                                     if stale >= 4:
