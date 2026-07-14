@@ -71,7 +71,18 @@ _XHS_EXPAND_JS = """
 _XHS_EXTRACT_COMMENTS_JS = """
 (maxComments) => {
     function pc(s) { if (!s) return 0; s = s.replace(',',''); if (s.includes('万')) return Math.round(parseFloat(s)*10000); var n = parseInt(s,10); return isNaN(n)?0:n; }
-    function countImgs(el) { return el.querySelectorAll('img:not(.avatar-item)').length; }
+    function countContentImgs(el) {
+        var imgs = el.querySelectorAll('img');
+        var count = 0;
+        for (var i = 0; i < imgs.length; i++) {
+            var img = imgs[i];
+            if (img.classList.contains('avatar-item')) continue;
+            var rect = img.getBoundingClientRect();
+            if (rect.width < 40 || rect.height < 40) continue;
+            count++;
+        }
+        return count;
+    }
     var items = document.querySelectorAll('.comments-container .parent-comment');
     var result = [];
     var totalImgs = 0;
@@ -89,7 +100,7 @@ _XHS_EXTRACT_COMMENTS_JS = """
         var likes = 0;
         if (likeText && likeText !== '赞') likes = pc(likeText);
         if (!userName || !content) continue;
-        var imgCount = countImgs(c);
+        var imgCount = countContentImgs(c);
         totalImgs += imgCount;
         var replies = [];
         var subItems = c.querySelectorAll('.reply-container .comment-item-sub');
@@ -105,7 +116,7 @@ _XHS_EXTRACT_COMMENTS_JS = """
             var replyTo = '';
             var atEl = s.querySelector('.at-text, [class*=_at_]');
             if (atEl) replyTo = atEl.textContent.trim().replace('@','');
-            if (sUserName && sContent) replies.push({ user: sUserName, content: sContent, likes: sLikes, reply_to: replyTo, images: countImgs(s) });
+            if (sUserName && sContent) replies.push({ user: sUserName, content: sContent, likes: sLikes, reply_to: replyTo, images: countContentImgs(s) });
         }
         result.push({ user: userName, content: content, likes: likes, replies: replies, images: imgCount });
     }
