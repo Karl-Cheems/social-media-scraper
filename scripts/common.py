@@ -125,10 +125,11 @@ _XHS_EXTRACT_COMMENTS_JS = """
 """
 
 
-async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 40):
+async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80):
     """在小红书详情页面滚动加载评论并依次点击子回复展开按钮。
 
-    策略：每轮先扫当前视口的展开按钮 → btn.click() 点掉 → 检查计数 → 小步滚动。
+    策略：每轮先扫当前视口的展开按钮 → btn.click() 点掉 → 检查计数 → 滚动。
+    滚动步长 600px，逐渐加大以免小步永远滚不到底。
 
     Returns:
         (comments_list, total_comment_images) 评论列表和评论区图片总数
@@ -141,6 +142,7 @@ async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 40):
 
     prev_cnt = 0
     stale_rounds = 0  # 连续几轮评论数没变化
+    scroll_step = 400  # 起始步长，逐步加大
 
     for _ in range(max_rounds):
         # 第一步：点展开
@@ -155,17 +157,19 @@ async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 40):
         if current_cnt >= max_comments:
             break
 
-        # 第三步：检测是否卡住了（连续滚但评论数不涨）
+        # 第三步：检测是否卡住了
         if current_cnt == prev_cnt and not clicked:
             stale_rounds += 1
-            if stale_rounds >= 5:  # 连续 5 轮无变化 → 到底了
+            # 如果已经滚了很多轮都无变化 → 到底了
+            if stale_rounds >= 10:
                 break
         else:
             stale_rounds = 0
         prev_cnt = current_cnt
 
-        # 第四步：小步滚动
-        await page.mouse.wheel(0, 250)
+        # 第四步：滚动（步长递增，更快触底）
+        await page.mouse.wheel(0, scroll_step)
+        scroll_step = min(scroll_step + 50, 800)
         await page.wait_for_timeout(600)
 
     await page.wait_for_timeout(1500)
