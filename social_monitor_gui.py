@@ -94,16 +94,16 @@ class SocialMonitorGUI:
         self.root.configure(bg=BG)
 
         self.script_dir = BUNDLE_DIR  # 脚本文件目录（scripts/, notify/）
-        self.urls_file = os.path.join(BASE_DIR, "urls.txt")
-        # keywords.json: 编辑写入 exe 同目录，只读回退到 BUNDLE_DIR
-        user_kw = os.path.join(BASE_DIR, "keywords.json")
-        bundle_kw = os.path.join(BUNDLE_DIR, "keywords.json") if getattr(sys, 'frozen', False) else user_kw
+        self.urls_file = os.path.join(BASE_DIR, "config", "urls.txt")
+        # keywords.json: 编辑写入 exe 同目录 config/，只读回退到 BUNDLE_DIR
+        user_kw = os.path.join(BASE_DIR, "config", "keywords.json")
+        bundle_kw = os.path.join(BUNDLE_DIR, "config", "keywords.json") if getattr(sys, 'frozen', False) else user_kw
         if getattr(sys, 'frozen', False) and os.path.isfile(user_kw):
             self.keywords_file = user_kw
         else:
             self.keywords_file = bundle_kw
 
-        self.schedule_file = os.path.join(BASE_DIR, "schedule_rules.json")
+        self.schedule_file = os.path.join(BASE_DIR, "config", "schedule_rules.json")
         self.rules = []
         self._schedule_running = False
 

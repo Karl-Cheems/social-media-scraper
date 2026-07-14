@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['social_monitor_gui.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
     datas=[
@@ -16,6 +16,7 @@ a = Analysis(
         ('scripts/weibo_scraper.py', 'scripts'),
         ('scripts/douyin_hot_search.py', 'scripts'),
         ('notify', 'notify'),
+        ('config/keywords.json', 'config'),
         ('.env', '.'),
     ],
     hiddenimports=['pydantic', 'requests'],

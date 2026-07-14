@@ -10,3 +10,10 @@ build/
 dist/
 *.spec
 data/
+tmp_ui_test/
+tmpug*
+*.txt
+probe_output*
+test_comment_result*
+check_note*
+playwright-tips.md
