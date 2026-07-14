@@ -433,8 +433,21 @@ class SocialMonitorGUI:
                                             command=self._toggle_all_kw, width=12)
         self.kw_select_all_btn.pack(side="right", padx=(4, 0))
 
-        self.kw_frame = ttk.Frame(cfg, style="Card.TLabelframe")
-        self.kw_frame.pack(fill="x", pady=(6, 0))
+        # 可滚动的关键词网格容器
+        kw_scroll_frame = ttk.Frame(cfg, style="Card.TLabelframe")
+        kw_scroll_frame.pack(fill="x", pady=(6, 0))
+        self.kw_canvas = tk.Canvas(kw_scroll_frame, bg=CARD_BG, highlightthickness=0, height=140)
+        self.kw_scrollbar = ttk.Scrollbar(kw_scroll_frame, orient="vertical", command=self.kw_canvas.yview)
+        self.kw_frame = ttk.Frame(self.kw_canvas, style="Card.TLabelframe")
+        self.kw_frame.bind("<Configure>", lambda e: self.kw_canvas.configure(scrollregion=self.kw_canvas.bbox("all")))
+        self.kw_canvas.create_window((0, 0), window=self.kw_frame, anchor="nw")
+        self.kw_canvas.configure(yscrollcommand=self.kw_scrollbar.set)
+        def _on_kw_mousewheel(event):
+            self.kw_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        self.kw_canvas.bind("<MouseWheel>", _on_kw_mousewheel)
+        self.kw_frame.bind("<MouseWheel>", _on_kw_mousewheel)
+        self.kw_canvas.pack(side="left", fill="both", expand=True)
+        self.kw_scrollbar.pack(side="right", fill="y")
 
         r_add = ttk.Frame(cfg, style="Card.TLabelframe")
         r_add.pack(fill="x", pady=(4, 0))
@@ -444,32 +457,40 @@ class SocialMonitorGUI:
         ttk.Button(r_add, text="+ 添加", style="Outline.TButton",
                    command=self._add_custom_keyword, width=8).pack(side="left")
 
-        r2 = ttk.Frame(cfg, style="Card.TLabelframe")
-        r2.pack(fill="x", pady=(6, 0))
+        # ── 平台选择 ──
+        r_plat = ttk.Frame(cfg, style="Card.TLabelframe")
+        r_plat.pack(fill="x", pady=(6, 0))
+        ttk.Label(r_plat, text="搜索平台:").pack(side="left", padx=(0, 16))
         self.kw_weibo = tk.BooleanVar(value=True)
-        ttk.Checkbutton(r2, text="微博", variable=self.kw_weibo).pack(side="left", padx=(0, 12))
+        ttk.Checkbutton(r_plat, text="微博", variable=self.kw_weibo).pack(side="left", padx=(0, 24))
         self.kw_xhs = tk.BooleanVar(value=True)
-        ttk.Checkbutton(r2, text="小红书", variable=self.kw_xhs).pack(side="left", padx=(0, 24))
-        ttk.Label(r2, text="每个关键词:").pack(side="left", padx=(0, 4))
-        self.kw_per = tk.StringVar(value="5")
-        ttk.Spinbox(r2, from_=1, to=20, textvariable=self.kw_per, width=5).pack(side="left", padx=(0, 4))
-        ttk.Label(r2, text="条  ").pack(side="left")
-        ttk.Label(r2, text="    评论数/条:").pack(side="left", padx=(0, 4))
-        self.kw_max_comments = tk.StringVar(value="300")
-        ttk.Spinbox(r2, from_=0, to=999, textvariable=self.kw_max_comments, width=5).pack(side="left", padx=(0, 4))
-        ttk.Label(r2, text="条").pack(side="left")
+        ttk.Checkbutton(r_plat, text="小红书", variable=self.kw_xhs).pack(side="left")
 
-        r_sort = ttk.Frame(cfg, style="Card.TLabelframe")
-        r_sort.pack(fill="x", pady=(2, 0))
-        ttk.Label(r_sort, text="排序方式:").pack(side="left", padx=(0, 8))
+        # ── 小红书参数（独立区域，明确仅小红书相关） ──
+        xhs_frame = ttk.LabelFrame(cfg, text="小红书参数", padding=8)
+        xhs_frame.pack(fill="x", pady=(6, 0))
+
+        r_x1 = ttk.Frame(xhs_frame)
+        r_x1.pack(fill="x", pady=(2, 4))
+        ttk.Label(r_x1, text="每个关键词:").pack(side="left", padx=(0, 4))
+        self.kw_per = tk.StringVar(value="5")
+        ttk.Spinbox(r_x1, from_=1, to=20, textvariable=self.kw_per, width=5).pack(side="left", padx=(0, 4))
+        ttk.Label(r_x1, text="条").pack(side="left", padx=(0, 20))
+        ttk.Label(r_x1, text="评论数/条:").pack(side="left", padx=(0, 4))
+        self.kw_max_comments = tk.StringVar(value="300")
+        ttk.Spinbox(r_x1, from_=0, to=999, textvariable=self.kw_max_comments, width=5).pack(side="left", padx=(0, 4))
+        ttk.Label(r_x1, text="条").pack(side="left")
+
+        r_x2 = ttk.Frame(xhs_frame)
+        r_x2.pack(fill="x", pady=(2, 0))
+        ttk.Label(r_x2, text="排序方式:").pack(side="left", padx=(0, 8))
         self.kw_sort_by = tk.StringVar(value="likes")
-        ttk.Radiobutton(r_sort, text="最多点赞", variable=self.kw_sort_by, value="likes").pack(side="left", padx=(0, 4))
-        ttk.Radiobutton(r_sort, text="最多评论", variable=self.kw_sort_by, value="comments").pack(side="left", padx=(0, 4))
-        ttk.Separator(r_sort, orient="vertical").pack(side="left", padx=(12, 8), fill="y")
-        ttk.Label(r_sort, text="内容类型:").pack(side="left", padx=(0, 8))
+        ttk.Radiobutton(r_x2, text="最多点赞", variable=self.kw_sort_by, value="likes").pack(side="left", padx=(0, 4))
+        ttk.Radiobutton(r_x2, text="最多评论", variable=self.kw_sort_by, value="comments").pack(side="left", padx=(0, 16))
+        ttk.Label(r_x2, text="内容类型:").pack(side="left", padx=(0, 8))
         self.kw_content_type = tk.StringVar(value="all")
-        ttk.Radiobutton(r_sort, text="不限", variable=self.kw_content_type, value="all").pack(side="left", padx=(0, 4))
-        ttk.Radiobutton(r_sort, text="仅图文", variable=self.kw_content_type, value="image_text").pack(side="left", padx=(0, 4))
+        ttk.Radiobutton(r_x2, text="不限", variable=self.kw_content_type, value="all").pack(side="left", padx=(0, 4))
+        ttk.Radiobutton(r_x2, text="仅图文", variable=self.kw_content_type, value="image_text").pack(side="left", padx=(0, 4))
 
         r3 = ttk.Frame(cfg, style="Card.TLabelframe")
         r3.pack(fill="x", pady=(6, 8))
@@ -489,6 +510,36 @@ class SocialMonitorGUI:
 
         self._make_log_area(f, "keyword")
         self._load_keywords()
+
+    def _save_custom_keyword(self, kw: str):
+        """将自定义关键词永久写入 keywords.json 并更新内存数据。"""
+        try:
+            with open(self.keywords_file, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = {"product_lines": []}
+        name = self.kw_product.get()
+        pl = next((p for p in data.get("product_lines", []) if p["name"] == name), None)
+        if not pl:
+            return
+        custom = pl.setdefault("custom", [])
+        if kw not in custom:
+            custom.append(kw)
+        try:
+            with open(self.keywords_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            # 同步更新内存数据
+            in_mem_pl = next((p for p in self._keywords_data if p["name"] == name), None)
+            if in_mem_pl:
+                in_mem_custom = in_mem_pl.setdefault("custom", [])
+                if kw not in in_mem_custom:
+                    in_mem_custom.append(kw)
+        except Exception as e:
+            print(f"  写入 keywords.json 失败: {e}", file=sys.stderr)
+
+        # 更新滚动区域
+        self.kw_frame.update_idletasks()
+        self.kw_canvas.configure(scrollregion=self.kw_canvas.bbox("all"))
 
     def _load_keywords(self):
         try:
@@ -513,23 +564,67 @@ class SocialMonitorGUI:
         if not pl:
             return
 
-        keywords = pl.get("keywords", [])
-        for col, kw in enumerate(keywords):
+        preset = pl.get("keywords", [])
+        custom = pl.get("custom", [])
+
+        # 预设关键词（无删除按钮）
+        col = 0
+        for kw in preset:
             var = tk.BooleanVar(value=True)
             cb = ttk.Checkbutton(self.kw_frame, text=kw, variable=var)
             cb.grid(row=col // 4, column=col % 4, sticky="w", padx=(4, 8), pady=2)
             self.kw_checkboxes[kw] = var
+            col += 1
+
+        # 自定义关键词（带 × 删除按钮）
+        for kw in custom:
+            var = tk.BooleanVar(value=True)
+            rf = ttk.Frame(self.kw_frame, style="Card.TLabelframe")
+            rf.grid(row=col // 4, column=col % 4, sticky="w", padx=(4, 4), pady=2)
+            cb = ttk.Checkbutton(rf, text=kw, variable=var)
+            cb.pack(side="left")
+            del_btn = ttk.Button(rf, text="×", style="Outline.TButton", width=3,
+                                 command=lambda k=kw: self._remove_custom_keyword(k))
+            del_btn.pack(side="left", padx=(2, 0))
+            self.kw_checkboxes[kw] = var
+            col += 1
+
+        self.kw_frame.update_idletasks()
+        self.kw_canvas.configure(scrollregion=self.kw_canvas.bbox("all"))
 
     def _add_custom_keyword(self):
         kw = self.kw_custom_entry.get().strip()
         if not kw or kw in self.kw_checkboxes:
             return
-        var = tk.BooleanVar(value=True)
-        cb = ttk.Checkbutton(self.kw_frame, text=kw, variable=var)
-        col = len(self.kw_checkboxes)
-        cb.grid(row=col // 4, column=col % 4, sticky="w", padx=(4, 8), pady=2)
-        self.kw_checkboxes[kw] = var
+        self._save_custom_keyword(kw)
         self.kw_custom_entry.delete(0, tk.END)
+        self._on_product_change()
+
+    def _remove_custom_keyword(self, kw: str):
+        try:
+            with open(self.keywords_file, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return
+        name = self.kw_product.get()
+        for data_pl in data.get("product_lines", []):
+            if data_pl["name"] == name:
+                custom = data_pl.get("custom", [])
+                if kw in custom:
+                    custom.remove(kw)
+                break
+        try:
+            with open(self.keywords_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"  写入 keywords.json 失败: {e}", file=sys.stderr)
+        for in_mem_pl in self._keywords_data:
+            if in_mem_pl["name"] == name:
+                in_mem_custom = in_mem_pl.get("custom", [])
+                if kw in in_mem_custom:
+                    in_mem_custom.remove(kw)
+                break
+        self._on_product_change()
 
     # ── Tab: 🏠 自有账号 ────────────────────────────────
 

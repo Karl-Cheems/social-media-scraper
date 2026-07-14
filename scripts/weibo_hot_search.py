@@ -96,6 +96,10 @@ async def scrape_hot_search(
                         // 从独立的 rank 元素取排名（[class*=_rankimg_]）
                         var rankEl = el.querySelector('[class*=_rankimg_]');
                         var rankText = rankEl ? rankEl.textContent.trim() : '';
+                        // 跳过置顶（rankText 非纯数字，如"置顶""推荐"）
+                        if (rankText && !/^\d+$/.test(rankText)) continue;
+                        // 没有 rank 元素且文本不以数字开头 → 置顶/推荐位，跳过
+                        if (!rankEl && !/^\d/.test(txt)) continue;
                         var rank = parseInt(rankText, 10);
                         if (isNaN(rank) || rank < 1 || rank > 100) {
                             // 备选：从文本开头提取数字
@@ -229,14 +233,20 @@ async def _fetch_zhishou_detail(page, aisearch_url: str) -> ZhishouAnswer | None
     await page.goto(aisearch_url, wait_until="domcontentloaded", timeout=30000)
     await page.wait_for_timeout(3000)
 
-    # 提取回答正文：跳过导航和榜单，取主要内容区域
+    # 提取回答正文：只从主内容区域提取，排除右侧榜单侧边栏
     text = await page.evaluate("""
         () => {
-            var all = document.body.innerText || '';
+            // 只取主内容区域，排除右侧热搜榜侧边栏
+            var mainEl = document.querySelector('#pl_feedlist_index') || document.querySelector('.main-full');
+            if (!mainEl) return '';
+            var all = mainEl.innerText || '';
             var lines = all.split(String.fromCharCode(10));
             var skip = new Set(['NEW', '综合', '用户', '实时', '视频', '图片', '关注', '超话',
                 '高级搜索', '搜索结果', '更多', '刷新', '我的', '微博热搜', '热搜榜', '文娱榜',
                 '首页', '推荐', '话题']);
+            // 遇到这些标记立即终止
+            var stopMarkers = ['信源追溯', '风险提示', '查看完整热搜榜单', '创作者中心', '帮助中心',
+                '关于微博', 'Copyright', '客服', '数据中心'];
             var clean = [];
             var inAnswer = false;
 
@@ -244,24 +254,30 @@ async def _fetch_zhishou_detail(page, aisearch_url: str) -> ZhishouAnswer | None
                 var l = lines[i].trim();
                 if (!l) continue;
 
-                // 找到"回答"或"深度思考"标记开始采集
                 if (l === '回答' || l === '深度思考') {
                     inAnswer = true;
                     continue;
                 }
-                // 遇到信源/风险提示时停止
-                if (l.indexOf('信源追溯') >= 0 || l.indexOf('风险提示') >= 0) break;
-                // 跳过单行导航词
+                var shouldStop = false;
+                for (var s = 0; s < stopMarkers.length; s++) {
+                    if (l.indexOf(stopMarkers[s]) >= 0) { shouldStop = true; break; }
+                }
+                if (shouldStop) break;
                 if (skip.has(l)) continue;
                 if (inAnswer && l.length > 3) clean.push(l);
             }
 
-            // 如果没找到"回答"标记，兜底取所有大段文字
+            // 兜底：取所有大段文字
             if (clean.length < 3) {
                 clean = [];
                 for (var i = 0; i < lines.length; i++) {
                     var l = lines[i].trim();
                     if (!l || skip.has(l)) continue;
+                    var shouldStop = false;
+                    for (var s = 0; s < stopMarkers.length; s++) {
+                        if (l.indexOf(stopMarkers[s]) >= 0) { shouldStop = true; break; }
+                    }
+                    if (shouldStop) break;
                     if (l.length > 30) clean.push(l);
                 }
             }
@@ -289,12 +305,22 @@ async def _fetch_zhishou_detail(page, aisearch_url: str) -> ZhishouAnswer | None
             await page.wait_for_timeout(2000)
             expanded = await page.evaluate("""
                 () => {
-                    var all = document.body.innerText || '';
+                    var mainEl = document.querySelector('#pl_feedlist_index') || document.querySelector('.main-full');
+                    if (!mainEl) return '';
+                    var all = mainEl.innerText || '';
                     var lines = all.split(String.fromCharCode(10));
+                    var stopMarkers = ['创作者中心',
+                        '帮助中心', '关于微博', 'Copyright', '客服', '数据中心'];
                     var clean = [];
                     for (var i = 0; i < lines.length; i++) {
                         var l = lines[i].trim();
-                        if (l && l.length > 10) clean.push(l);
+                        if (!l) continue;
+                        var shouldStop = false;
+                        for (var s = 0; s < stopMarkers.length; s++) {
+                            if (l.indexOf(stopMarkers[s]) >= 0) { shouldStop = true; break; }
+                        }
+                        if (shouldStop) break;
+                        if (l.length > 10) clean.push(l);
                     }
                     return clean.join(String.fromCharCode(10));
                 }
