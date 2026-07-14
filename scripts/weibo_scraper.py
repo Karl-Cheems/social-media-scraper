@@ -256,17 +256,29 @@ async def scrape_profile(
                                     return null;
                                 })()
                             """)
-                            await detail_page.wait_for_timeout(1000)
-                            scroll_rounds = min(60, max(5, max_comments // 2))
+                            await detail_page.wait_for_timeout(500)
+                            max_rounds = min(20, max(5, max_comments // 5))
                             # 鼠标移到评论区域再 wheel（微博评论懒加载依赖 wheel 事件，window.scrollBy 无效）
                             if comment_pos and comment_pos['top'] > 0:
                                 await detail_page.mouse.move(comment_pos['left'] + 50, comment_pos['top'] + 10, steps=3)
-                            for _ in range(scroll_rounds):
-                                # 每次先 scrollIntoView 到底部触发懒加载
+                            prev_cols = 0
+                            stale = 0
+                            for _ in range(max_rounds):
                                 await detail_page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-                                await detail_page.wait_for_timeout(800)
-                                await detail_page.mouse.wheel(0, 300)
-                                await detail_page.wait_for_timeout(800)
+                                await detail_page.wait_for_timeout(300)
+                                await detail_page.mouse.wheel(0, 200)
+                                await detail_page.wait_for_timeout(500)
+                                # 动态检测评论行数，不增长就提前结束
+                                cur = await detail_page.evaluate(
+                                    "() => document.body.innerText.split(String.fromCharCode(10)).filter(function(l){return l.indexOf(':')===0 && l.length > 2}).length"
+                                )
+                                if cur > prev_cols:
+                                    stale = 0
+                                    prev_cols = cur
+                                else:
+                                    stale += 1
+                                    if stale >= 3:
+                                        break
 
                             comments_list = await detail_page.evaluate(
                                 """(maxC) => {
@@ -284,7 +296,7 @@ async def scrape_profile(
                                     // 跳过空行找到第一个用户名（非数字、非日期、非空的行）
                                     while (idx < lines.length) {
                                         var l = lines[idx];
-                                        if (/^\d{1,2}-\d{1,2}/.test(l) || /^\d{1,2}月/.test(l) || l.indexOf('发布于') >= 0 || l.indexOf('来自') >= 0 || /^\d+$/.test(l)) {
+                                        if (/^\\d{1,2}-\\d{1,2}/.test(l) || /^\\d{1,2}月/.test(l) || l.indexOf('发布于') >= 0 || l.indexOf('来自') >= 0 || /^\\d+$/.test(l)) {
                                             idx++;
                                         } else { break; }
                                     }
