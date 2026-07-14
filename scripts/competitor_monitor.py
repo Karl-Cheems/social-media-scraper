@@ -200,6 +200,7 @@ def main():
         from datetime import datetime
         output = {
             "collected_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "source": "competitor_monitor",
             "total_accounts": len(results),
             "accounts": results,
         }

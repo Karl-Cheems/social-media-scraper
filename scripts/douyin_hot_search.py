@@ -156,6 +156,7 @@ def main():
     from datetime import datetime
     output = {
         "collected_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "source": "douyin_hot_search",
         "total_topics": len(results),
         "topics": [r.model_dump(mode="json") for r in results],
     }

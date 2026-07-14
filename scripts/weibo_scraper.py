@@ -12,6 +12,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sys
 # ── 路径修补 ──
 _scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
@@ -202,6 +203,22 @@ async def scrape_profile(
                 if detail_url:
                     # 在新 tab 中打开详情页，提取完自动关闭
                     detail_page = await context.new_page()
+
+                    # 拦截 buildComments API 请求，获取数字 id
+                    _captured_weibo_id = None
+                    async def _capture_comment_id(request):
+                        nonlocal _captured_weibo_id
+                        if 'buildComments' in request.url and _captured_weibo_id is None:
+                            try:
+                                from urllib.parse import parse_qs, urlparse
+                                qs = parse_qs(urlparse(request.url).query)
+                                ids = qs.get('id', [])
+                                if ids and ids[0].isdigit():
+                                    _captured_weibo_id = ids[0]
+                            except Exception:
+                                pass
+                    detail_page.on('request', _capture_comment_id)
+
                     try:
                         await detail_page.goto(detail_url, wait_until="domcontentloaded", timeout=30000)
                         await detail_page.wait_for_timeout(3000)
@@ -243,83 +260,201 @@ async def scrape_profile(
                         # 多次滚动以触发评论加载（微博是用虚拟滚动，滑出的评论 DOM 被移除）
                         # 必须一边滚动一边提取，累积去重，不能等滚动完再提取
                         if fetch_comments:
-                            # 先定位到"评论"区域
-                            comment_pos = await detail_page.evaluate("""
-                                (() => {
-                                    var els = document.querySelectorAll('*');
-                                    for (var el of els) {
-                                        if (el.children.length === 0 && (el.textContent || '').trim() === '评论') {
-                                            el.scrollIntoView({block: 'start'});
-                                            var r = el.getBoundingClientRect();
-                                            return {top: r.top, left: r.left, bottom: r.bottom};
-                                        }
-                                    }
-                                    return null;
-                                })()
-                            """)
-                            await detail_page.wait_for_timeout(500)
-                            max_rounds = min(50, max(10, max_comments // 2))
-                            if comment_pos and comment_pos['top'] > 0:
-                                await detail_page.mouse.move(comment_pos['left'] + 50, comment_pos['top'] + 10, steps=3)
+                            # 直接通过微博 API 获取全部评论，不依赖 DOM 虚拟滚动
+                            # API: /ajax/statuses/buildComments?id=X&count=20&max_id=Y
 
-                            all_comments = []       # 累积的所有评论
-                            seen_content = set()    # 去重
-                            stale = 0
-                            for _ in range(max_rounds):
-                                # scrollTo 到底 + 多次 wheel 确保触发懒加载
-                                await detail_page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-                                await detail_page.wait_for_timeout(400)
-                                await detail_page.mouse.wheel(0, 100)
-                                await detail_page.wait_for_timeout(300)
-                                await detail_page.mouse.wheel(0, 100)
+                            # 先确保登录状态可用（API 需要鉴权 cookie）
+                            await detail_page.wait_for_timeout(1000)
+
+                            # 从拦截到的请求中拿 weibo_id
+                            weibo_id = _captured_weibo_id
+                            uid = await detail_page.evaluate("location.pathname.match(/\\/(\\d+)\\//)?.[1] || ''")
+                            if weibo_id:
+                                print(f"    weibo_id={weibo_id}", file=sys.stderr)
+
+                            all_comments = []
+                            seen_texts = set()
+                            api_rounds = 0
+
+                            if weibo_id:
+                                # API 方式：分页拉取
+                                max_id = 0
+                                total_needed = max_comments
+                                for api_rounds in range(100):
+                                    if len(all_comments) >= total_needed:
+                                        break
+                                    params = f"is_reload=1&id={weibo_id}&is_show_bulletin=2&is_mix=0&count=20&uid={uid}&fetch_level=0&locale=zh-CN"
+                                    if max_id:
+                                        params += f"&max_id={max_id}"
+
+                                    result = await detail_page.evaluate(f"""async () => {{
+                                        try {{
+                                            var r = await fetch('/ajax/statuses/buildComments?{params}');
+                                            return await r.json();
+                                        }} catch(e) {{
+                                            return {{error: e.message}};
+                                        }}
+                                    }}""")
+
+                                    if result.get('error') or not result.get('ok'):
+                                        break
+
+                                    total_number = result.get('total_number', 0)
+                                    data = result.get('data', []) or []
+
+                                    for c in data:
+                                        raw = (c.get('text_raw', '') or '').strip()
+                                        text = re.sub(r'\[[^\]]+\]', '', raw).strip()
+                                        if not text:
+                                            text = (c.get('text', '') or '').strip()
+                                            text = re.sub(r'<[^>]+>', '', text).strip()
+                                        if text:
+                                            key = text[:50]
+                                            if key not in seen_texts:
+                                                seen_texts.add(key)
+                                                user_name = c.get('user', {}).get('screen_name', '') if isinstance(c.get('user'), dict) else ''
+                                                all_comments.append({
+                                                    "user": user_name,
+                                                    "content": text,
+                                                    "likes": c.get('like_counts', 0),
+                                                })
+
+                                    new_max_id = result.get('max_id', 0)
+                                    if not new_max_id or new_max_id == max_id:
+                                        break
+                                    max_id = new_max_id
+
+                                    if len(data) < 20:
+                                        break
+
+                                print(f"    API 共 {api_rounds+1} 页，采到 {len(all_comments)}/{total_number} 条评论", file=sys.stderr)
+                            else:
+                                # 回退方案：提取 URL 末尾字符，转 mid
+                                print(f"    ⚠️ 未能获取 weibo_id，尝试从 URL 提取", file=sys.stderr)
+                                # 从 URL 直接提取 mid
+                                mid_match = await detail_page.evaluate("""() => {
+                                    var m = location.href.match(/weibo\\.com\\/\\d+\\/([a-zA-Z0-9]+)/);
+                                    return m ? m[1] : null;
+                                }""")
+                                if mid_match:
+                                    # 用 mid 查 API
+                                    result = await detail_page.evaluate(f"""async () => {{
+                                        try {{
+                                            var r = await fetch('/ajax/statuses/buildComments?is_reload=1&id={mid_match}&is_show_bulletin=2&is_mix=0&count=20&locale=zh-CN');
+                                            return await r.json();
+                                        }} catch(e) {{ return {{error: e.message}}; }}
+                                    }}""")
+                                    if result.get('ok') and result.get('data'):
+                                        total_number = result.get('total_number', 0)
+                                        for c in (result.get('data', []) or []):
+                                            text = (c.get('text_raw', '') or '').strip()
+                                            text = re.sub(r'\[[^\]]+\]', '', text).strip()
+                                            if not text:
+                                                text = (c.get('text', '') or '').strip()
+                                                text = re.sub(r'<[^>]+>', '', text).strip()
+                                            if text:
+                                                key = text[:50]
+                                                if key not in seen_texts:
+                                                    seen_texts.add(key)
+                                                    all_comments.append({"user": c.get('user', {}).get('screen_name', ''), "content": text, "likes": c.get('like_counts', 0)})
+
+                                        # 分页
+                                        max_id = result.get('max_id', 0)
+                                        for _ in range(50):
+                                            if len(all_comments) >= max_comments or not max_id:
+                                                break
+                                            params = f"is_reload=1&id={mid_match}&is_show_bulletin=2&is_mix=0&count=20&max_id={max_id}&locale=zh-CN"
+                                            r2 = await detail_page.evaluate(f"""async () => {{
+                                                try {{ var r = await fetch('/ajax/statuses/buildComments?{params}'); return await r.json(); }} catch(e) {{ return {{}}; }}
+                                            }}""")
+                                            for c in (r2.get('data', []) or []):
+                                                text = (c.get('text_raw', '') or '').strip()
+                                                text = re.sub(r'\[[^\]]+\]', '', text).strip()
+                                                if not text:
+                                                    text = (c.get('text', '') or '').strip()
+                                                    text = re.sub(r'<[^>]+>', '', text).strip()
+                                                if text:
+                                                    key = text[:50]
+                                                    if key not in seen_texts:
+                                                        seen_texts.add(key)
+                                                        all_comments.append({"user": c.get('user', {}).get('screen_name', ''), "content": text, "likes": c.get('like_counts', 0)})
+                                            max_id = r2.get('max_id', 0)
+
+                                        print(f"    API(mid) {len(all_comments)} 条", file=sys.stderr)
+
+                            if not all_comments:
+                                # 终极回退：DOM 方式
+                                print(f"    ⚠️ API 失败，回退 DOM 模式", file=sys.stderr)
+                                for _ in range(50):
+                                    await detail_page.evaluate("window.scrollBy(0, 300)")
+                                    await detail_page.wait_for_timeout(100)
+                                    found = await detail_page.evaluate("""() => document.body.innerText.split(String.fromCharCode(10)).some(function(l) { return l.trim() === '评论' && l.length === 2; })""")
+                                    if found:
+                                        break
                                 await detail_page.wait_for_timeout(500)
-                                # 提取当前可见的评论
-                                batch = await detail_page.evaluate(
-                                    """() => {
-                                        var text = document.body.innerText || '';
-                                        var lines = text.split('\\n');
-                                        var start = -1;
-                                        for (var i = 0; i < lines.length; i++) {
-                                            if (lines[i] === '评论') { start = i; break; }
-                                        }
-                                        if (start < 0) return [];
-                                        // 跳过 按热度/按时间 标签
-                                        var idx = start;
-                                        while (idx < lines.length && (lines[idx] === '评论' || lines[idx] === '按热度' || lines[idx] === '按时间')) idx++;
-                                        // 解析用户:内容行
-                                        var result = [];
-                                        for (var j = idx; j < lines.length; j++) {
-                                            var l = lines[j];
-                                            if (l === '分享这条博文' || l === '已加载全部评论') break;
-                                            if (result.length > 200) break;
-                                            var next = lines[j + 1] || '';
-                                            if (next.indexOf(':') === 0 && next.length > 2 && l.indexOf(' ') < 0 && !/^\\d/.test(l)) {
-                                                result.push({
-                                                    user: l,
-                                                    content: next.substring(1).trim(),
-                                                    likes: 0
-                                                });
-                                                j++;
-                                            }
-                                        }
-                                        return result;
-                                    }"""
-                                )
-                                new_count = 0
-                                for c in batch:
-                                    key = c.get('content', '')[:40]
-                                    if key and key not in seen_content:
-                                        seen_content.add(key)
-                                        all_comments.append(c)
-                                        new_count += 1
-                                if new_count > 0:
-                                    stale = 0
+
+                                for _ in range(200):
                                     if len(all_comments) >= max_comments:
                                         break
-                                else:
-                                    stale += 1
-                                    if stale >= 4:
+                                    await detail_page.evaluate("window.scrollBy(0, 200)")
+                                    await detail_page.wait_for_timeout(100)
+                                    await detail_page.mouse.wheel(0, 50)
+                                    await detail_page.wait_for_timeout(150)
+
+                                    batch = await detail_page.evaluate("""() => {
+                                        var lines = document.body.innerText.split(String.fromCharCode(10));
+                                        var cmtIdx = -1;
+                                        for (var i = 0; i < lines.length; i++) {
+                                            if (lines[i] === '评论' && lines[i].length === 2) { cmtIdx = i; break; }
+                                        }
+                                        if (cmtIdx < 0) return [];
+                                        var r = [];
+                                        for (var j = cmtIdx + 1; j < lines.length; j++) {
+                                            var l = lines[j];
+                                            if (l.length > 0 && l.charCodeAt(0) === 58 && l.length > 2) {
+                                                var c = l.substring(1).trim();
+                                                if (c.length > 1 && r.length < 200) r.push({user: '', content: c, likes: 0});
+                                            }
+                                        }
+                                        return r;
+                                    }""")
+                                    for c in batch:
+                                        sig = c['content'][:60]
+                                        if sig and sig not in seen_texts:
+                                            seen_texts.add(sig)
+                                            all_comments.append(c)
+
+                                # 再跳到底加载更多
+                                for _ in range(10):
+                                    if len(all_comments) >= max_comments:
                                         break
+                                    await detail_page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                                    await detail_page.wait_for_timeout(500)
+                                    await detail_page.mouse.wheel(0, 200)
+                                    await detail_page.wait_for_timeout(300)
+
+                                    batch2 = await detail_page.evaluate("""() => {
+                                        var lines = document.body.innerText.split(String.fromCharCode(10));
+                                        var cmtIdx = -1;
+                                        for (var i = 0; i < lines.length; i++) {
+                                            if (lines[i] === '评论' && lines[i].length === 2) { cmtIdx = i; break; }
+                                        }
+                                        if (cmtIdx < 0) return [];
+                                        var r = [];
+                                        for (var j = cmtIdx + 1; j < lines.length; j++) {
+                                            var l = lines[j];
+                                            if (l.length > 0 && l.charCodeAt(0) === 58 && l.length > 2) {
+                                                var c = l.substring(1).trim();
+                                                if (c.length > 1 && r.length < 200) r.push({user: '', content: c, likes: 0});
+                                            }
+                                        }
+                                        return r;
+                                    }""")
+                                    for c in batch2:
+                                        sig = c['content'][:60]
+                                        if sig and sig not in seen_texts:
+                                            seen_texts.add(sig)
+                                            all_comments.append(c)
 
                             comments_list = all_comments[:max_comments]
 

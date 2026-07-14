@@ -245,81 +245,87 @@ async def _scrape_weibo_url(page, context, url: str, max_comments: int) -> dict:
         print(f"  正文: {len(detail.get('text',''))} 字", file=sys.stderr)
         print(f"  互动: 转={detail.get('reposts',-1)} 评={detail.get('comments',-1)} 赞={detail.get('likes',-1)}", file=sys.stderr)
 
-        # 评论
+        # 评论 — 直接调微博 API，不依赖 DOM 虚拟滚动
         comments_list = []
         if max_comments > 0:
-            scroll_rounds = min(30, max(5, max_comments // 4))
-            for _ in range(scroll_rounds):
-                await detail_page.evaluate("window.scrollBy(0, 1500)")
-                await detail_page.wait_for_timeout(800)
-
-            comments_list = await detail_page.evaluate("""
-            (maxC) => {
-                var text = document.body.innerText || '';
-                var lines = text.split('\\n').filter(function(l){return l.trim()});
-
-                var commentStart = -1;
-                for (var i = 0; i < lines.length; i++) {
-                    if (lines[i] === '评论') { commentStart = i + 1; break; }
-                }
-                if (commentStart < 0) {
-                    // 没找到"评论"标记，改用 DOM 方式：找"按热度"或"按时间"
-                    for (var i = 0; i < lines.length; i++) {
-                        if (lines[i] === '按热度' || lines[i] === '按时间') { commentStart = i; break; }
-                    }
-                    if (commentStart < 0) return [];
-                }
-
-                var idx = commentStart;
-                // 跳过排序标签
-                while (idx < lines.length && (lines[idx] === '按热度' || lines[idx] === '按时间')) idx++;
-                // 跳过空行找到第一个用户名（非数字、非日期、非空的行）
-                while (idx < lines.length) {
-                    var l = lines[idx];
-                    if (/^\\d{1,2}-\\d{1,2}/.test(l) || /^\\d{1,2}月/.test(l) || l.indexOf('发布于') >= 0 || l.indexOf('来自') >= 0 || /^\\d+$/.test(l)) {
-                        idx++;
-                    } else { break; }
-                }
-
-                var result = [];
-                var pendingUser = '';
-                var pendingContent = '';
-                var inContent = false;
-                for (var j = idx; j < lines.length; j++) {
-                    var l = lines[j];
-                    if (l === '已加载全部评论' || l === '分享这条博文') break;
-                    if (result.length >= maxC) break;
-
-                    if (l.indexOf(':') === 0) {
-                        pendingContent = l.substring(1).trim();
-                        inContent = true;
-                    } else if (/^\\d{1,2}-\\d{1,2}-\\d{1,2}/.test(l) || l.indexOf('发布于') >= 0 || l.indexOf('来自') >= 0) {
-                        if (inContent) {
-                            result.push({ user: pendingUser || '(未知)', content: pendingContent || '', likes: 0 });
-                            pendingUser = '';
-                            pendingContent = '';
-                            inContent = false;
+            await detail_page.wait_for_timeout(500)
+            # 从 performance API 拿到 buildComments 请求的数字 id
+            weibo_id = await detail_page.evaluate("""
+                () => {
+                    try {
+                        var entries = performance.getEntriesByType('resource');
+                        for (var i = entries.length - 1; i >= 0; i--) {
+                            var url = entries[i].name;
+                            var idx = url.indexOf('buildComments?id=');
+                            if (idx >= 0) {
+                                var after = url.substring(idx + 17);
+                                var end = after.indexOf('&');
+                                if (end > 0) return after.substring(0, end);
+                            }
+                            idx = url.indexOf('buildComments?');
+                            if (idx >= 0) {
+                                var qs = url.substring(idx + 14);
+                                for (var part of qs.split('&')) {
+                                    if (part.startsWith('id=')) return part.substring(3);
+                                }
+                            }
                         }
-                    } else if (/^\\d+$/.test(l)) {
-                    } else {
-                        if (inContent) {
-                            result.push({ user: pendingUser || '(未知)', content: pendingContent || '', likes: 0 });
-                            pendingUser = '';
-                            pendingContent = '';
-                        }
-                        pendingUser = l;
-                        pendingContent = '';
-                        inContent = false;
-                    }
+                    } catch(e) {}
+                    // fallback: 从 URL 取
+                    var m = location.href.match(/weibo\\.com\\/\\d+\\/([a-zA-Z0-9]+)/);
+                    return m ? m[1] : null;
                 }
-                if (pendingUser && inContent) {
-                    result.push({ user: pendingUser, content: pendingContent || '', likes: 0 });
-                }
-                return result;
-            }
-            """, max_comments)
+            """)
+            uid = await detail_page.evaluate("location.pathname.match(/\\/(\\d+)\\//)?.[1] || ''")
+            print(f"    weibo_id={weibo_id}", file=sys.stderr) if weibo_id else None
 
-        print(f"  评论: {len(comments_list)} 条", file=sys.stderr)
+            if weibo_id:
+                all_comments = []
+                seen = set()
+                max_id = 0
+                for _ in range(100):
+                    if len(all_comments) >= max_comments:
+                        break
+                    params = f"is_reload=1&id={weibo_id}&is_show_bulletin=2&is_mix=0&count=20&fetch_level=0&locale=zh-CN"
+                    if uid:
+                        params += f"&uid={uid}"
+                    if max_id:
+                        params += f"&max_id={max_id}"
+
+                    result = await detail_page.evaluate(f"""async () => {{
+                        try {{
+                            var r = await fetch('/ajax/statuses/buildComments?{params}');
+                            return await r.json();
+                        }} catch(e) {{ return {{}}; }}
+                    }}""")
+                    if not result.get('ok') or not result.get('data'):
+                        break
+
+                    import re
+                    for c in (result.get('data', []) or []):
+                        raw = (c.get('text_raw', '') or '').strip()
+                        text = re.sub(r'\[[^\]]+\]', '', raw).strip()
+                        if not text:
+                            text = (c.get('text', '') or '').strip()
+                            text = re.sub(r'<[^>]+>', '', text).strip()
+                        if text:
+                            key = text[:50]
+                            if key not in seen:
+                                seen.add(key)
+                                user_name = c.get('user', {}).get('screen_name', '') if isinstance(c.get('user'), dict) else ''
+                                all_comments.append({"user": user_name, "content": text, "likes": c.get('like_counts', 0)})
+
+                    new_max_id = result.get('max_id', 0)
+                    if not new_max_id or new_max_id == max_id:
+                        break
+                    max_id = new_max_id
+                    if len(result.get('data', [])) < 20:
+                        break
+
+                comments_list = all_comments[:max_comments]
+                print(f"  评论: {len(comments_list)} 条（API）", file=sys.stderr)
+            else:
+                print(f"  ⚠️ 无法获取 weibo_id，跳过评论", file=sys.stderr)
 
         return {
             "platform": "weibo",

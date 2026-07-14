@@ -125,6 +125,7 @@ def main():
     collected_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     output = {
         "collected_at": collected_at,
+        "source": "hot_search",
         "platforms": platforms_data,
     }
 

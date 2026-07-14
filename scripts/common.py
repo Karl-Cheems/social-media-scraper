@@ -51,7 +51,6 @@ _XHS_EXPAND_JS = """
 () => {
     var btns = document.querySelectorAll('.comments-container .show-more, .comments-container [class*=expand]');
     var vh = window.innerHeight;
-    var count = 0;
     for (var btn of btns) {
         var t = (btn.textContent || '').trim();
         var r = btn.getBoundingClientRect();
@@ -61,10 +60,10 @@ _XHS_EXPAND_JS = """
             btn.dataset._ex_done = '1';
             btn.scrollIntoView({block: 'center'});
             btn.click();
-            count++;
+            return 1;  // 每轮只点一个，模拟人一次只看一条子回复
         }
     }
-    return count;
+    return 0;
 }
 """
 
@@ -116,7 +115,10 @@ _XHS_EXTRACT_COMMENTS_JS = """
             var replyTo = '';
             var atEl = s.querySelector('.at-text, [class*=_at_]');
             if (atEl) replyTo = atEl.textContent.trim().replace('@','');
-            if (sUserName && sContent) replies.push({ user: sUserName, content: sContent, likes: sLikes, reply_to: replyTo, images: countContentImgs(s) });
+            if (sUserName && sContent) {
+                replies.push({ user: sUserName, content: sContent, likes: sLikes, reply_to: replyTo, images: countContentImgs(s) });
+                totalImgs += countContentImgs(s);
+            }
         }
         result.push({ user: userName, content: content, likes: likes, replies: replies, images: imgCount });
     }
@@ -125,15 +127,16 @@ _XHS_EXTRACT_COMMENTS_JS = """
 """
 
 
-async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80, container_scroll: bool = False):
+async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80):
     """在小红书详情页面滚动加载评论并依次点击子回复展开按钮。
 
     策略：每轮先扫当前视口的展开按钮 → btn.click() 点掉 → 检查计数 → 滚动。
     滚动步长 600px。
+    兼容 SPA 弹窗（.note-scroller 容器）和独立详情页（window 滚动）。
 
     Args:
-        container_scroll: True=滚动 .comments-container 容器（SPA弹窗详情页），
-                          False=滚动 window（独立页面详情页）
+        max_comments: 最大评论数
+        max_rounds: 最大滚动轮次
     Returns:
         (comments_list, total_comment_images) 评论列表和评论区图片总数
     """
@@ -144,54 +147,57 @@ async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80, con
     await page.wait_for_timeout(300)
 
     prev_cnt = 0
-    stale_rounds = 0  # 连续几轮评论数没变化
-    scroll_step = 600
+    stale_rounds = 0
+    scroll_step = 500  # 步长适中，触发懒加载
+    max_rounds_effective = max(max_rounds, max_comments // 3 + 10)  # 自动计算足够轮次
 
-    for _ in range(max_rounds):
-        # 第一步：点展开
+    for _ in range(max_rounds_effective):
+        # 第一步：短等再操作
+        await page.wait_for_timeout(random.randint(400, 800))
+
+        # 第二步：点展开（每轮只点一个）
         clicked = await page.evaluate(_XHS_EXPAND_JS)
         if clicked:
-            await page.wait_for_timeout(500)
+            await page.wait_for_timeout(random.randint(800, 1500))
 
-        # 第二步：检查计数
+        # 第三步：检查计数
         current_cnt = await page.evaluate(
             "document.querySelectorAll('.comments-container .parent-comment').length"
         )
         if current_cnt >= max_comments:
             break
 
-        # 第三步：检测是否卡住了
+        # 第四步：检测是否卡住了（放宽阈值）
         if current_cnt == prev_cnt:
             if not clicked:
                 stale_rounds += 1
-                if stale_rounds >= 5:
+                if stale_rounds >= 8:
+                    # 卡住后加大步长尝试一下再放弃
+                    if scroll_step < 800:
+                        scroll_step = 800
+                        stale_rounds = 0
+                        continue
                     break
         else:
             stale_rounds = 0
         prev_cnt = current_cnt
 
-        # 第四步：滚动
-        if container_scroll:
-            # SPA 弹窗详情页（keyword_search/xiaohongshu_scraper模式）
-            # 注意：.comments-container 是 overflow-y: visible，对它 scrollBy 无效
-            # 真正的可滚动容器是 .note-scroller (overflow-y: scroll)
-            # 先把最后一条 parent-comment 滚到视口底部，再微调触发懒加载
-            await page.evaluate(f"""
-                (() => {{
-                    var items = document.querySelectorAll('.note-scroller .parent-comment');
+        # 第五步：滚动（立即跳转，不用 smooth——自动化不需要动画）
+        await page.evaluate(f"""
+            (() => {{
+                var ns = document.querySelector('.note-scroller');
+                if (ns) {{
+                    var items = ns.querySelectorAll('.parent-comment');
                     if (items.length > 0) {{
                         items[items.length - 1].scrollIntoView({{block: 'end'}});
                     }}
-                    var ns = document.querySelector('.note-scroller');
-                    if (ns) ns.scrollBy(0, {scroll_step});
-                    // fallback: 尝试 mouse wheel 模拟
-                    if (!ns) window.scrollBy(0, {scroll_step});
-                }})()
-            """)
-        else:
-            # 独立详情页（url_detail 模式）：直接滚动 window
-            await page.evaluate(f"window.scrollBy(0, {scroll_step})")
-        await page.wait_for_timeout(800)
+                    ns.scrollBy(0, {scroll_step});
+                }} else {{
+                    window.scrollBy(0, {scroll_step});
+                }}
+            }})()
+        """)
+        await page.wait_for_timeout(random.randint(600, 1000))
 
     await page.wait_for_timeout(1500)
     result = await page.evaluate(_XHS_EXTRACT_COMMENTS_JS, max_comments)
