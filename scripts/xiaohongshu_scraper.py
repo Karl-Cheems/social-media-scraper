@@ -10,13 +10,18 @@
 
 import argparse
 import asyncio
+import os
 import re
 import sys
+# ── 路径修补 ──
+_scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
 
 from pydantic import BaseModel, Field
 from playwright.async_api import async_playwright
 
-from common import CommentItem, launch_browser, get_edge_user_data, write_output, random_delay, normalize_time, wait_for_login, xhs_search_by_input
+from common import CommentItem, ReplyItem, flatten_comments, launch_browser, get_edge_user_data, write_output, random_delay, normalize_time, wait_for_login, xhs_search_by_input, xhs_expand_comments
 from datetime import datetime as _dt
 
 
@@ -29,6 +34,7 @@ class NoteEngagement(BaseModel):
     comments: int = Field(description="评论数")
     published_at: str = Field(default="", description="发布时间（如 2小时前、06-28）")
     comments_list: list[CommentItem] = Field(default_factory=list, description="评论列表")
+    comment_images: int = Field(default=0, description="评论区图片总数")
     url: str = Field(description="笔记链接")
 
 
@@ -408,49 +414,27 @@ async def scrape_profile(
                     }
                     """)
 
-                    # ── 提取评论（热门前 3-10 条）──────────
+                    # ── 提取评论（公用函数）────
                     comments_list = []
+                    comment_images = 0
                     if fetch_comments:
                         await page.wait_for_timeout(1000)
-                        comments_list = await page.evaluate("""
-                        (maxComments) => {
-                            var items = document.querySelectorAll('.comments-container .parent-comment');
-                            var result = [];
-                            var max = Math.min(items.length, maxComments);
-                            for (var i = 0; i < max; i++) {
-                                var c = items[i];
+                        try:
+                            comments_list, comment_images = await xhs_expand_comments(page, max_comments)
+                        except Exception:
+                            pass
 
-                                var nameEl = c.querySelector('.author .name');
-                                var userName = nameEl ? nameEl.textContent.trim() : '';
-
-                                var noteText = c.querySelector('.content .note-text');
-                                var content = noteText ? noteText.textContent.trim() : '';
-
-                                var likeNum = c.querySelector('.like-wrapper .count');
-                                var likeText = likeNum ? likeNum.textContent.trim() : '';
-                                var likes = 0;
-                                if (likeText && likeText !== '赞') {
-                                    likes = parseInt(likeText, 10) || 0;
-                                }
-
-                                if (userName && content) {
-                                    result.push({ user: userName, content: content, likes: likes });
-                                }
-                            }
-                            return result;
-                        }
-                        """, max_comments)
-
-                    print(f"  详情页: 赞={detail_data.get('likes',-1)} 收={detail_data.get('collects',-1)} 评={detail_data.get('comments',-1)} 评论{len(comments_list)}条", file=sys.stderr)
+                    print(f"  详情页: 赞={detail_data.get('likes',-1)} 收={detail_data.get('collects',-1)} 评={detail_data.get('comments',-1)} 评论{len(comments_list)}条 图片{comment_images}张", file=sys.stderr)
 
                     note = NoteEngagement(
                         title=title,
                         content=detail_data.get("note_text", "") if not no_content else "",
-                        likes=detail_data.get("likes", -1) if detail_data.get("likes", -1) > 0 else likes,
-                        collects=detail_data.get("collects", -1) if detail_data.get("collects", -1) > 0 else collects,
+                        likes=detail_data.get("likes", -1) if detail_data.get("likes", -1) >= 0 else likes,
+                        collects=detail_data.get("collects", -1) if detail_data.get("collects", -1) >= 0 else collects,
                         comments=detail_data.get("comments", -1),
                         published_at=normalize_time(detail_data.get("published_at", "") or ""),
                         comments_list=comments_list,
+                        comment_images=comment_images,
                         url=url,
                     )
                     if idx < len(unpinned) - 1:
@@ -470,7 +454,10 @@ async def scrape_profile(
                 ls = f"{note.likes}" if note.likes >= 0 else "?"
                 cs = f"{note.collects}" if note.collects >= 0 else "?"
                 cm = f"{note.comments}" if note.comments >= 0 else "?"
-                cc = f"({len(note.comments_list)}条评论)" if note.comments_list else ""
+                cc = f"({len(note.comments_list)}条评论" if note.comments_list else ""
+                if note.comment_images:
+                    cc += f", {note.comment_images}张图片"
+                cc += ")" if cc else ""
                 label = f"  [{len(notes)}] {'📌' if item.get('pinned') else ''} {title[:24]}... 赞={ls} 收={cs} 评={cm}{cc}"
                 print(label, file=sys.stderr)
 
@@ -495,7 +482,7 @@ def main():
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
     parser.add_argument("--no-content", action="store_true", help="不获取笔记正文（默认获取）")
     parser.add_argument("--no-comments", action="store_true", help="不获取评论（默认获取）")
-    parser.add_argument("--max-comments", type=int, default=10, help="每条笔记最多采集评论数（默认 10）")
+    parser.add_argument("--max-comments", type=int, default=50, help="每条笔记最多采集评论数（默认 50）")
     parser.add_argument("--visible", action="store_true", help="显示浏览器窗口（默认隐藏）")
     parser.add_argument(
         "--url",
@@ -515,6 +502,11 @@ def main():
     ))
 
     output = result.model_dump(mode="json")
+    # 压平评论为纯文本
+    for n in output.get("notes", []):
+        if "comments_list" in n:
+            n["comments_text"] = flatten_comments(n["comments_list"])
+            del n["comments_list"]
 
     write_output(output, args.output)
 

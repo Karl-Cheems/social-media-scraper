@@ -37,10 +37,16 @@ def _read_env(key: str) -> str:
 DEFAULT_URL = _read_env("AGENT_URL")
 DEFAULT_SENDER = _read_env("AGENT_SENDER") or "ou_66f8c01a0c53113c68ced2a1685ddf72"
 DEFAULT_CHAT = _read_env("AGENT_CHAT") or "ou_66f8c01a0c53113c68ced2a1685ddf72"
+DEFAULT_PREFIX = _read_env("AGENT_PREFIX") or "使用social-intelligence-refinery处理以下内容"
 
 
 def detect_type(data: dict) -> str:
     """自动识别数据类型，返回中文标签。"""
+    if "source" in data and data.get("source") == "url_detail":
+        d = data.get("data", {})
+        plat = d.get("platform", "")
+        return f"内容详情（{plat}）"
+
     if "platforms" in data and "keywords" in data:
         return "关键词搜索"
     if "platforms" in data:
@@ -55,15 +61,64 @@ def detect_type(data: dict) -> str:
     if "weibos" in data:
         author = data.get("author", "")
         return f"微博账号数据（{author}）" if author else "微博账号数据"
+    if "source" in data and data.get("source") == "url_detail":
+        d = data.get("data", {})
+        plat = d.get("platform", "")
+        return f"内容详情（{plat}）"
     if "notes" in data:
         author = data.get("author", "")
         return f"小红书账号数据（{author}）" if author else "小红书账号数据"
     return "社交媒体数据"
 
 
+def detect_type_key(data: dict) -> str:
+    """返回机器可读的数据类型 key。"""
+    if "source" in data and data.get("source") == "url_detail":
+        return "detail"
+    if "source" in data and data.get("source") == "url_detail":
+        d = data.get("data", {})
+        plat = d.get("platform", "")
+        return f"内容详情（{plat}）"
+
+    if "platforms" in data and "keywords" in data:
+        return "keyword"
+    if "platforms" in data:
+        return "hot"
+    if "topics" in data:
+        return "hot"
+    if "accounts" in data or "weibos" in data or "notes" in data:
+        return "account"
+    return "unknown"
+
+
 def build_summary(data: dict, data_type: str) -> str:
     """构建发送给 Agent 的文本摘要。"""
     lines = [f"【{data_type}】{data.get('collected_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))}"]
+
+    if "source" in data and data.get("source") == "url_detail":
+        d = data.get("data", {})
+        plat = d.get("platform", "")
+        lines.append(f"平台: {plat}")
+        lines.append(f"标题: {d.get('title', '')}")
+        text = d.get('text', '') or ''
+        lines.append(f"正文: {text[:500]}")
+        likes = d.get('likes', '?')
+        comments_cnt = d.get('comments', '?')
+        author = d.get('author', '?')
+        img = d.get('comment_images', 0)
+        lines.append(f"作者: {author}  👍{likes}  💬{comments_cnt}" + (f"  🖼️{img}" if img else ""))
+        cc = d.get("comments_text", "")
+        if cc:
+            clines = cc.strip().split("\n")
+            lines.append(f"\n评论（{len([l for l in clines if l and l != '---'])} 条）:")
+            for l in clines[:120]:
+                if l == "---":
+                    lines.append(l)
+                elif l.startswith("  回复:"):
+                    lines.append(f"    ↳ {l[4:].strip()[:60]}")
+                else:
+                    lines.append(f"  💬 {l[:80]}")
+        return "\n".join(lines)
 
     if "platforms" in data and "keywords" in data:
         keywords = data.get("keywords", [])
@@ -78,10 +133,25 @@ def build_summary(data: dict, data_type: str) -> str:
                 text = (item.get("text", "") or item.get("title", "") or "")[:80]
                 likes = item.get("likes", "?")
                 comments_cnt = item.get("comments", "?")
-                lines.append(f"  {text} (👍{likes} 💬{comments_cnt})")
-                cc = item.get("comments_list", [])
-                for c in cc[:3]:
-                    lines.append(f"    💬 {c.get('user', '')}: {(c.get('content', '') or '')[:40]}")
+                img_cnt = item.get("comment_images", 0)
+                line = f"  {text} (👍{likes} 💬{comments_cnt})"
+                if img_cnt:
+                    line += f" 🖼️{img_cnt}"
+                lines.append(line)
+                cc = item.get("comments_text", "")
+                if cc:
+                    clines = cc.strip().split("\n")
+                    shown = 0
+                    for l in clines:
+                        if shown >= 5:
+                            break
+                        if l == "---":
+                            continue
+                        if l.startswith("  回复:"):
+                            lines.append(f"      ↳ {l[4:].strip()[:40]}")
+                        else:
+                            lines.append(f"      💬 {l[:40]}")
+                            shown += 1
 
     elif "platforms" in data:
         platforms = data.get("platforms", [])
@@ -139,7 +209,10 @@ def build_summary(data: dict, data_type: str) -> str:
                     text = item.get("content", "") or item.get("title", "")
                     likes = item.get("likes", "?")
                     comments = item.get("comments", "?")
-                    lines.append(f"  📝 {(text or '')[:80]} (👍{likes} 💬{comments})")
+                    img_cnt = item.get("comment_images", 0)
+                    line = f"  📝 {(text or '')[:80]} (👍{likes} 💬{comments})"
+                    if img_cnt: line += f" 🖼️{img_cnt}"
+                    lines.append(line)
                 else:
                     text = item.get("text", "") or ""
                     likes = item.get("likes", "?")
@@ -157,9 +230,15 @@ def build_summary(data: dict, data_type: str) -> str:
             likes = w.get("likes", "?")
             lines.append(f"\n📝 {text}")
             lines.append(f"   🔄{reposts}  👍{likes}  💬{comments}")
-            cc = w.get("comments_list", [])
-            for c in cc[:3]:
-                lines.append(f"   💬 {c.get('user', '')}: {(c.get('content', '') or '')[:50]}")
+            cc = w.get("comments_text", "")
+            if cc:
+                for l in cc.strip().split("\n")[:10]:
+                    if l == "---":
+                        continue
+                    if l.startswith("  回复:"):
+                        lines.append(f"     ↳ {l[4:].strip()[:50]}")
+                    else:
+                        lines.append(f"   💬 {l[:50]}")
 
     elif "notes" in data:
         author = data.get("author", "?")
@@ -169,27 +248,53 @@ def build_summary(data: dict, data_type: str) -> str:
             likes = n.get("likes", "?")
             collects = n.get("collects", "?")
             comments = n.get("comments", "?")
+            img_cnt = n.get("comment_images", 0)
+            line = f"   👍{likes}  📂{collects}  💬{comments}"
+            if img_cnt: line += f"  🖼️{img_cnt}"
             lines.append(f"\n📝 {(content or '')[:120]}")
-            lines.append(f"   👍{likes}  📂{collects}  💬{comments}")
-            cc = n.get("comments_list", [])
-            for c in cc[:3]:
-                lines.append(f"   💬 {c.get('user', '')}: {(c.get('content', '') or '')[:50]}")
+            lines.append(line)
+            cc = n.get("comments_text", "")
+            if cc:
+                for l in cc.strip().split("\n")[:10]:
+                    if l == "---":
+                        continue
+                    if l.startswith("  回复:"):
+                        lines.append(f"     ↳ {l[4:].strip()[:50]}")
+                    else:
+                        lines.append(f"   💬 {l[:50]}")
 
     return "\n".join(lines)
 
 
-def send(data: dict, server_url: str, sender_id: str, chat_id: str) -> bool:
-    """发送数据到服务端 Agent。"""
-    data_type = detect_type(data)
+def send(data: dict, server_url: str, sender_id: str, chat_id: str,
+         source_type: str | None = None,
+         prefix: str | None = None) -> bool:
+    """发送数据到服务端 Agent。
 
-    # 构建摘要文本
-    summary = build_summary(data, data_type)
+    Args:
+        data: 采集的原始 JSON 数据
+        server_url: Agent RPC 地址
+        sender_id: 发送者 ID
+        chat_id: 会话 ID
+        source_type: 来源类型 (self/competitor/keyword/hot)，None 则自动识别
+    """
+    data_type = detect_type(data)
+    data_type_key = source_type or detect_type_key(data)
+
+    # 把原始 JSON 转为文本
+    raw_json_text = json.dumps(data, ensure_ascii=False, indent=2)
 
     payload = {
         "channel": "feishu",
-        "content": f"【{data_type}】\n\n{summary}",
+        "content": f"{prefix or DEFAULT_PREFIX}\n\n{raw_json_text}",
         "sender_id": sender_id,
         "chat_id": chat_id,
+        "data_type": data_type_key,       # 机器可读的类型：hot/keyword/account
+        "source": {                        # 来源分类，供 Agent 技能路由
+            "type": data_type_key,
+            "label": data_type,
+        },
+        "raw_data": data,                  # 完整原始数据
     }
 
     try:
@@ -209,6 +314,10 @@ def main():
     parser.add_argument("--sender", default=DEFAULT_SENDER, help="sender_id")
     parser.add_argument("--chat", default=DEFAULT_CHAT, help="chat_id")
     parser.add_argument("--dry-run", action="store_true", help="仅预览摘要，不发送")
+    parser.add_argument("--source-type", choices=["self", "competitor", "keyword", "hot", "account", "detail"],
+                        default=None, help="来源类型（自动识别如果不传）")
+    parser.add_argument("--prefix", default=None, help="content 前缀提示词")
+    parser.add_argument("--save-dir", default=None, help="保存原始 JSON 的目录（可选）")
 
     args = parser.parse_args()
 
@@ -218,13 +327,29 @@ def main():
     data_type = detect_type(data)
     summary = build_summary(data, data_type)
     print(f"识别类型: {data_type}", file=sys.stderr)
+    print(f"来源类型: {args.source_type or '自动识别'}", file=sys.stderr)
     print(f"数据概要: {len(summary)} 字符", file=sys.stderr)
+
+    # 保存原始 JSON 副本到指定目录
+    save_dir = args.save_dir or os.environ.get("SOCIAL_MONITOR_DATA_DIR")
+    if save_dir:
+        source_key = args.source_type or detect_type_key(data)
+        sub_map = {"hot": "hot", "keyword": "keyword", "account": "account",
+                   "self": "account", "competitor": "account"}
+        sub = sub_map.get(source_key, "")
+        target_dir = os.path.join(save_dir, sub) if sub else save_dir
+        os.makedirs(target_dir, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = os.path.join(target_dir, f"agent_{source_key}_{ts}.json")
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"[保存原始数据] {save_path}", file=sys.stderr)
 
     if args.dry_run:
         print(summary)
         return
 
-    ok = send(data, args.url, args.sender, args.chat)
+    ok = send(data, args.url, args.sender, args.chat, source_type=args.source_type, prefix=args.prefix)
     if ok:
         print("✅ 已发送到服务端 Agent", file=sys.stderr)
     else:

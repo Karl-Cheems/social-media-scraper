@@ -15,9 +15,13 @@ import os
 import random
 import re
 import sys
+# ── 路径修补 ──
+_scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
 import time
 
-from common import write_output
+from common import flatten_comments, write_output
 
 import weibo_scraper
 import xiaohongshu_scraper
@@ -60,7 +64,7 @@ async def scrape_account(identifier: str, limit: int, fetch_comments: bool,
             limit=limit,
             headless=headless,
             fetch_comments=fetch_comments,
-            max_comments=max_comments,
+            max_comments=max_comments,  # 微博 60 条
         )
         return {
             "platform": "weibo",
@@ -75,22 +79,32 @@ async def scrape_account(identifier: str, limit: int, fetch_comments: bool,
                     "likes": w.likes,
                     "url": w.url,
                     "published_at": w.published_at,
-                    "comments_list": [
-                        {"user": c.user, "content": c.content, "likes": c.likes}
+                    "comments_text": flatten_comments([
+                        {
+                            "user": c.user,
+                            "content": c.content,
+                            "likes": c.likes,
+                            "replies": [
+                                {"user": r.user, "content": r.content, "likes": r.likes, "reply_to": r.reply_to}
+                                for r in c.replies
+                            ],
+                        }
                         for c in w.comments_list
-                    ],
+                    ]),
                 }
                 for w in result.weibos
             ],
         }
 
     elif platform == 'xiaohongshu':
+        # 小红书限 50 条
+        xhs_max = min(max_comments, 50)
         result = await xiaohongshu_scraper.scrape_profile(
             profile_url=profile_url,
             limit=limit,
             headless=headless,
             fetch_comments=fetch_comments,
-            max_comments=max_comments,
+            max_comments=xhs_max,
             no_content=no_content,
         )
         return {
@@ -107,10 +121,19 @@ async def scrape_account(identifier: str, limit: int, fetch_comments: bool,
                     "comments": n.comments,
                     "url": n.url,
                     "published_at": n.published_at,
-                    "comments_list": [
-                        {"user": c.user, "content": c.content, "likes": c.likes}
+                    "comment_images": getattr(n, 'comment_images', 0),
+                    "comments_text": flatten_comments([
+                        {
+                            "user": c.user,
+                            "content": c.content,
+                            "likes": c.likes,
+                            "replies": [
+                                {"user": r.user, "content": r.content, "likes": r.likes, "reply_to": r.reply_to}
+                                for r in c.replies
+                            ],
+                        }
                         for c in n.comments_list
-                    ],
+                    ]),
                 }
                 for n in result.notes
             ],
@@ -132,7 +155,7 @@ def main():
     parser.add_argument("--limit", type=int, default=10, help="每个账号采集数量上限（默认 10）")
     parser.add_argument("--no-content", action="store_true", help="不获取笔记正文（小红书，默认获取）")
     parser.add_argument("--no-comments", action="store_true", help="不获取评论（默认获取）")
-    parser.add_argument("--max-comments", type=int, default=10, help="每条内容最多采集评论数（默认 10）")
+    parser.add_argument("--max-comments", type=int, default=60, help="每条内容最多采集评论数（默认 60，微博 60/条，小红书 50/条）")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
     parser.add_argument("--visible", action="store_true", help="显示浏览器窗口（默认隐藏）")
 
