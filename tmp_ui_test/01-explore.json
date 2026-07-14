@@ -1,0 +1,161 @@
+{
+  "url": "https://www.xiaohongshu.com/explore",
+  "title": "小红书 - 你的生活兴趣社区",
+  "bodyClass": "ai-layout-active",
+  "searchInputs": [
+    {
+      "tag": "DIV",
+      "id": "",
+      "cls": "with-gradient-background search-area-in-header",
+      "placeholder": "",
+      "visible": false,
+      "rect": {
+        "w": 0,
+        "h": 0,
+        "top": 0
+      },
+      "opacity": "1",
+      "ariaHidden": "",
+      "tabIndex": "",
+      "value": ""
+    },
+    {
+      "tag": "DIV",
+      "id": "",
+      "cls": "wendian-wrapper search-input",
+      "placeholder": "",
+      "visible": false,
+      "rect": {
+        "w": 0,
+        "h": 0,
+        "top": 0
+      },
+      "opacity": "1",
+      "ariaHidden": "",
+      "tabIndex": "",
+      "value": ""
+    },
+    {
+      "tag": "TEXTAREA",
+      "id": "search-input",
+      "cls": "textarea",
+      "placeholder": "2026黑客松大赛时间表",
+      "visible": false,
+      "rect": {
+        "w": 0,
+        "h": 0,
+        "top": 0
+      },
+      "opacity": "1",
+      "ariaHidden": "",
+      "tabIndex": "",
+      "value": ""
+    },
+    {
+      "tag": "DIV",
+      "id": "",
+      "cls": "search-area search-area-opacity",
+      "placeholder": "",
+      "visible": true,
+      "rect": {
+        "w": 1286,
+        "h": 116,
+        "top": 62
+      },
+      "opacity": "1",
+      "ariaHidden": "",
+      "tabIndex": "",
+      "value": ""
+    },
+    {
+      "tag": "DIV",
+      "id": "",
+      "cls": "input-box search-box-in-content",
+      "placeholder": "",
+      "visible": true,
+      "rect": {
+        "w": 920,
+        "h": 116,
+        "top": 62
+      },
+      "opacity": "1",
+      "ariaHidden": "",
+      "tabIndex": "",
+      "value": ""
+    },
+    {
+      "tag": "DIV",
+      "id": "",
+      "cls": "wendian-wrapper search-input large",
+      "placeholder": "",
+      "visible": true,
+      "rect": {
+        "w": 920,
+        "h": 116,
+        "top": 62
+      },
+      "opacity": "1",
+      "ariaHidden": "",
+      "tabIndex": "",
+      "value": ""
+    },
+    {
+      "tag": "TEXTAREA",
+      "id": "search-input-in-feeds",
+      "cls": "textarea",
+      "placeholder": "2026黑客松大赛时间表",
+      "visible": true,
+      "rect": {
+        "w": 878,
+        "h": 41,
+        "top": 83
+      },
+      "opacity": "1",
+      "ariaHidden": "",
+      "tabIndex": "",
+      "value": ""
+    }
+  ],
+  "searchAreas": [
+    {
+      "cls": "with-gradient-background search-area-in-header",
+      "visible": false,
+      "rect": {
+        "w": 0,
+        "h": 0,
+        "top": 0
+      },
+      "opacity": "1"
+    },
+    {
+      "cls": "search-area search-area-opacity",
+      "visible": true,
+      "rect": {
+        "w": 1286,
+        "h": 116,
+        "top": 62
+      },
+      "opacity": "1"
+    }
+  ],
+  "filters": [
+    {
+      "cls": "graphic-filter",
+      "tag": "DIV",
+      "text": "只看图文",
+      "visible": true,
+      "rect": {
+        "w": 40,
+        "h": 40,
+        "top": 606,
+        "left": 1442
+      }
+    }
+  ],
+  "panels": [],
+  "tags": [],
+  "tabs": [],
+  "aiChat": 0,
+  "noteCount": 30,
+  "hasDetail": false
+}

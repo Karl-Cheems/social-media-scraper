@@ -1,0 +1,68 @@
+  Edge 旧进程已清理
+  使用已有 Playwright 配置
+  已启动 Edge (PID=20596)
+  Edge DevTools 就绪（+1s）
+  ✅ 已连接到你的 Edge
+
+=== 打开: https://www.xiaohongshu.com/explore/6a4b60a0000000001101197f... ===
+=== 包含正文的最可能的元素 TOP 15 ===
+  1. <div> id=global class=layout limit
+     parent:  | grand: 
+     长度:785 开头: 网页版 创作中心业务合作发现RED直播发布通知我我沪ICP备13030189号  | 营业执照  | 2024沪公网安备
+  2. <div> id= class=main-container
+     parent: layout limit | grand: 
+     长度:773 开头: 发现RED直播发布通知我我沪ICP备13030189号  | 营业执照  | 2024沪公网安备310101020025
+  3. <div> id= class=side-bar
+     parent: main-container | grand: layout limit
+     长度:717 开头: 发现RED直播发布通知我我沪ICP备13030189号  | 营业执照  | 2024沪公网安备310101020025
+  4. <ul> id= class=channel-list
+     parent: side-bar | grand: main-container
+     长度:360 开头: 发现RED直播发布通知我我沪ICP备13030189号  | 营业执照  | 2024沪公网安备310101020025
+  5. <div> id=explore-guide-menu class=information-container
+     parent: side-bar | grand: main-container
+     长度:356 开头: 更多  关于我们 沪ICP备13030189号  | 营业执照  | 2024沪公网安备31010102002533号 
+  6. <div> id= class=app-info
+     parent: channel-list | grand: side-bar
+     长度:347 开头: 沪ICP备13030189号  | 营业执照  | 2024沪公网安备31010102002533号  | 增值电信业务
+  7. <div> id= class=app-info outside
+     parent: information-container | grand: side-bar
+     长度:347 开头: 沪ICP备13030189号  | 营业执照  | 2024沪公网安备31010102002533号  | 增值电信业务
+  8. <div> id= class=reds-alert
+     parent:  | grand: 
+     长度:64 开头: 温馨提示   您的浏览器似乎开启了广告屏蔽插件，可能对正常使用造成影响，请移除插件或将小红书加入插件白名单后继续使用。 
+  9. <div> id= class=reds-alert-wrapper slot-content
+     parent: reds-alert | grand: 
+     长度:64 开头: 温馨提示   您的浏览器似乎开启了广告屏蔽插件，可能对正常使用造成影响，请移除插件或将小红书加入插件白名单后继续使用。 
+  10. <div> id= class=reds-alert-content
+     parent: reds-alert-wrapper slot-content | grand: reds-alert
+     长度:52 开头: 您的浏览器似乎开启了广告屏蔽插件，可能对正常使用造成影响，请移除插件或将小红书加入插件白名单后继续使用。
+  11. <div> id= class=text
+     parent: reds-alert-content | grand: reds-alert-wrapper slot-content
+     长度:52 开头: 您的浏览器似乎开启了广告屏蔽插件，可能对正常使用造成影响，请移除插件或将小红书加入插件白名单后继续使用。
+  12. <div> id= class=with-side-bar main-content
+     parent: main-container | grand: layout limit
+     长度:45 开头: 当前笔记暂时无法浏览 请打开小红书App扫码查看  小红书如何扫码  问题反馈  返回首页
+  13. <div> id= class=access-limit-container
+     parent: with-side-bar main-content | grand: main-container
+     长度:45 开头: 当前笔记暂时无法浏览 请打开小红书App扫码查看  小红书如何扫码  问题反馈  返回首页
+  14. <div> id= class=access-container
+     parent: access-limit-container | grand: with-side-bar main-content
+     长度:45 开头: 当前笔记暂时无法浏览 请打开小红书App扫码查看  小红书如何扫码  问题反馈  返回首页
+  15. <a> id= class=icp-text
+     parent: icp-info | grand: app-info
+     长度:40 开头: 医疗器械网络交易服务第三方平台备案：(沪)网械平台备字[2019]第00006号
+
+=== 包含 note/content 关键词的容器 ===
+  DIV.with-side-bar main-content
+    长度:45 开头: 当前笔记暂时无法浏览 请打开小红书App扫码查看  小红书如何扫码  问题反馈  返回首页
+  DIV.reds-alert-wrapper slot-content
+    长度:64 开头: 温馨提示   您的浏览器似乎开启了广告屏蔽插件，可能对正常使用造成影响，请移除插件或将小红书加入插件白名单后继续使用。 
+  DIV.reds-alert-content
+    长度:52 开头: 您的浏览器似乎开启了广告屏蔽插件，可能对正常使用造成影响，请移除插件或将小红书加入插件白名单后继续使用。
+
+=== 广告屏蔽检测 ===
+  找到 '广告屏蔽插件' 在位置 664096: ...知我我 我要申诉我知道了 温馨提示   您的浏览器似乎开启了广告屏蔽插件，可能对正常使用造成影响，请移除插件或将小红书加入插件白名单后继续使用。 我知道了 活动  活动 window.__SSR__=truewindow...
+  找到 '您的浏览器似乎' 在位置 664086: ...首页 发现直播发布通知我我 我要申诉我知道了 温馨提示   您的浏览器似乎开启了广告屏蔽插件，可能对正常使用造成影响，请移除插件或将小红书加入插件白名单后继续使用。 我知道了 活动  活动 window.__SSR__=...
+
+=== textContent 前300字 ===
+  function e(e){for(var r=1;r<arguments.length;r++){var t=null!=arguments[r]?arguments[r]:{},n=Object.keys(t);"function"==typeof Object.getOwnPropertySymbols&&(n=n.concat(Object.getOwnPropertySymbols(t).filter(function(e){return Object.getOwnPropertyDescriptor(t,e).enumerable}))),n.forEach(function(r)

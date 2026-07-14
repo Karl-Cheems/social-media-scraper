@@ -1,0 +1,22 @@
+{
+  "bodyClass": "ai-layout-active",
+  "keywordsFound": {
+    "最多点赞": "NOT FOUND",
+    "最多收藏": "NOT FOUND",
+    "最多评论": "NOT FOUND",
+    "一周内": "NOT FOUND",
+    "一天内": "NOT FOUND",
+    "半年内": "NOT FOUND",
+    "不限": "档流，无跳变。\n */\n.xhs-im-media-preview-large[data-v-72bbef7a] {\n  position: absolute;\n  inset: 0;\n  width: 100%;\n  height: 100%;\n  object-fit: contain;\n  display: block;\n}\n\n/* ── 缩略图列表：水平间距 30px，垂直间距 16px，不限高度 ── */\n.xhs-im-media-preview-thumbs[data-v-72bbef7a] {\n  display: flex;\n  flex-direction: row;\n  flex-wrap: wrap;\n  column-gap: 30px;\n  row-gap: 16px;\n  padding: 12px 16px;\n  overflow-y: auto;\n  fle",
+    "图文": "r(--primary);\n}\n\n\n/* ── 全屏遮罩 ─────────────────────────────────────────────────────────────── */\n.xhs-im-viewer-overlay[data-v-10d7fff7] {\n  position: fixed;\n  inset: 0;\n  z-index: 9999;\n  /* 半透明模糊背景，与图文笔记查看器保持一致 */\n  background: rgba(0, 0, 0, 0.88);\n  backdrop-filter: blur(20px);\n  -webkit-backdrop-filter: blur(20px);\n  -webkit-user-select: none;\n          user-select: none;\n  outline: none;\n}\n\n/* 进",
+    "视频": "it: cover;\n}\n\n/* 无封面时的占位色块 */\n.xhs-im-bubble-card-note-cover-placeholder[data-v-3fa1abe8] {\n  width: 210px;\n  height: 210px;\n  /* 占位色块：使用 fill2 Token，深色模式下变为深灰 */\n  background: var(--fill2);\n}\n\n/* ── 视频笔记播放角标：绝对定位于封面右上角（flex-center 居中图标） ──────── */\n.xhs-im-bubble-card-note-video-icon[data-v-3fa1abe8] {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  position: absolute;\n  right:",
+    "最新": "NOT FOUND",
+    "综合": "<use data-v-55b36ac6=\"\" xlink:href=\"#tab_btn_right\"></use></svg></div></div></div></div><div data-v-da963056=\"\" class=\"content-container\"><button data-v-45d84c74=\"\" data-v-da963056-s=\"\" aria-details=\"综合\" class=\"tab active\">综合</button><button data-v-45d84c74=\"\" data-v-da963056-s=\"\" aria-details=\"悉尼\" class=\"tab\">悉尼</button><button data-v-45d84c74=\"\" data-v-da963056-s=\"\" aria-details=\"厦门\" class=\"tab\">厦",
+    "已看过": "NOT FOUND",
+    "未看过": "NOT FOUND",
+    "已关注": "NOT FOUND",
+    "同城": "NOT FOUND",
+    "附近": "NOT FOUND"
+  },
+  "newClasses": []
+}

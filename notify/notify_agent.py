@@ -314,7 +314,7 @@ def main():
     parser.add_argument("--sender", default=DEFAULT_SENDER, help="sender_id")
     parser.add_argument("--chat", default=DEFAULT_CHAT, help="chat_id")
     parser.add_argument("--dry-run", action="store_true", help="仅预览摘要，不发送")
-    parser.add_argument("--source-type", choices=["self", "competitor", "keyword", "hot", "account", "detail"],
+    parser.add_argument("--source-type", choices=["self", "self_account", "competitor", "competitor_account", "keyword", "hot", "account", "detail"],
                         default=None, help="来源类型（自动识别如果不传）")
     parser.add_argument("--prefix", default=None, help="content 前缀提示词")
     parser.add_argument("--save-dir", default=None, help="保存原始 JSON 的目录（可选）")
@@ -335,7 +335,8 @@ def main():
     if save_dir:
         source_key = args.source_type or detect_type_key(data)
         sub_map = {"hot": "hot", "keyword": "keyword", "account": "account",
-                   "self": "account", "competitor": "account"}
+                   "self": "account", "self_account": "account", "competitor": "account",
+                   "competitor_account": "account"}
         sub = sub_map.get(source_key, "")
         target_dir = os.path.join(save_dir, sub) if sub else save_dir
         os.makedirs(target_dir, exist_ok=True)

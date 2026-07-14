@@ -1,0 +1,126 @@
+{
+  "url": "https://www.xiaohongshu.com/search_result/?keyword=%E5%A5%B6%E8%8C%B6&source=web_search_result_notes&type=51",
+  "title": "奶茶 - 小红书搜索",
+  "bodyClass": "ai-layout-active",
+  "uiVersion": "ai-layout",
+  "searchInput": {
+    "outer": "<input value=\"\" type=\"text\" spellcheck=\"false\" class=\"search-input\" placeholder=\"搜索小红书\" autocomplete=\"off\" button-hp-installed=\"1\" data-hp-kind=\"input.search-input\" name=\"hp-inputsearch-input\" aria-hidden=\"true\" tabindex=\"-1\" style=\"position: absolute; opacity: 1e-05; pointer-events: auto; inset: 0px auto auto 0px; transform: none; margin: 0px; z-index: -1; width: 462.125px; height: 40px;\">",
+    "attr_hidden": "true",
+    "attr_tabindex": "-1",
+    "style": "position: absolute; opacity: 1e-05; pointer-events: auto; inset: 0px auto auto 0px; transform: none; margin: 0px; z-index: -1; width: 462.125px; height: 40px;"
+  },
+  "searchBox": "not found",
+  "topTabs": [
+    {
+      "text": "综合",
+      "cls": "tab active",
+      "active": true
+    },
+    {
+      "text": "悉尼",
+      "cls": "tab",
+      "active": false
+    },
+    {
+      "text": "厦门",
+      "cls": "tab",
+      "active": false
+    },
+    {
+      "text": "伦敦",
+      "cls": "tab",
+      "active": false
+    },
+    {
+      "text": "上海",
+      "cls": "tab",
+      "active": false
+    },
+    {
+      "text": "柳州",
+      "cls": "tab",
+      "active": false
+    },
+    {
+      "text": "墨尔本",
+      "cls": "tab",
+      "active": false
+    },
+    {
+      "text": "南京",
+      "cls": "tab",
+      "active": false
+    },
+    {
+      "text": "香港",
+      "cls": "tab",
+      "active": false
+    },
+    {
+      "text": "真实照片",
+      "cls": "tab",
+      "active": false
+    },
+    {
+      "text": "法拉盛",
+      "cls": "tab",
+      "active": false
+    },
+    {
+      "text": "联名7月",
+      "cls": "tab",
+      "active": false
+    },
+    {
+      "text": "必喝榜",
+      "cls": "tab",
+      "active": false
+    },
+    {
+      "text": "天津",
+      "cls": "tab",
+      "active": false
+    },
+    {
+      "text": "贵阳",
+      "cls": "tab",
+      "active": false
+    }
+  ],
+  "filterPanel": {
+    "outer": "<input id=\"search-input\" value=\"\" type=\"text\" spellcheck=\"false\" class=\"search-input\" placeholder=\"搜索小红书\" autocomplete=\"off\" data-v-24dd9158=\"\" data-hp-bound=\"1\">",
+    "tag": "INPUT",
+    "cls": "search-input"
+  },
+  "filterTagsAll": [
+    "",
+    "",
+    "",
+    "图文",
+    "视频",
+    "用户"
+  ],
+  "tagsFromText": [
+    "综合",
+    "视频",
+    "图文",
+    "推荐"
+  ],
+  "cards": {
+    "count": 44,
+    "firstNoteURL": "https://www.xiaohongshu.com/explore/69cb82dc000000001a022148",
+    "firstCardHTML": "<section data-v-2c7e3363=\"\" data-v-6717e264=\"\" class=\"note-item\" data-width=\"1440\" data-height=\"1920\" data-index=\"0\" style=\"--1992eea1: 231.6px; --194cdbd8: 16px; --330e65f2: blur(42.5px); transform: translate(0px, 0px);\"><div data-v-2c7e3363=\"\"><a data-v-2c7e3363=\"\" href=\"/explore/69cb82dc000000001a022148\" style=\"display: none;\"></a><a data-v-2c7e3363=\"\" class=\"cover mask ld\" target=\"_self\" href=\"/search_result/69cb82dc000000001a022148?xsec_token=AB21nNJ-J-9X1Np8fIXx2uRF1A8qGHCy-3PaIxCbKkb_U=&amp;xsec_source=\" style=\"height: 309px;\"><img data-v-2c7e3363=\"\" src=\"https://sns-webpic-qc.xhscdn.com/202607081439/a997bfaee16565b37b984838c3269bd1/1040g00831ucddg132g105ps76hqhie7vaoiho78!nc_n_webp_mw_1\" fetchpriority=\"auto\" loading=\"lazy\" decoding=\"async\" data-xhs-img=\"\" elementtiming=\"card-exposed\" style=\"width: 100%; height: 100%; object-fit: cover;\"><!----><!----><!----></a><div data-v-2c7e3363=\"\" class=\"footer\"><!----><a data-v-2c7e3363=\"\" href=\"/search_result/69cb82dc000000001a022148?xsec_token=AB21nNJ-J-9X1Np8fIXx2uRF1A8qGHCy-3PaIxCbKkb_U=&amp;xsec_source=\" target=\"_self\" class=\"title\"><span data-v-51ec0135=\"\" data-v-2c7e3363=\"\">狂炫不胖低卡奶茶合集（200大卡版）</span></a><div data-v-ab401f42=\"\" data-v-6717e264=\"\" data-v-2c7e3363-s=\"\" class=\"card-bottom-wrapper\"><a data-v-ab401f42=\"\" href=\"/user/profile/6787347500000000060138ff?channel_type=web_search_result_notes&amp;parent_page_channel_type=web_profile_board&amp;xsec_token=ABIbESsnVN8HYJcbxAl7AJxaewwlPkgrQHkbM3TSyDEOM=&amp;xsec_source=pc_se",
+    "childTags": [
+      "DIV [狂炫不胖低卡奶茶合集（200大卡版）炫我]",
+      "A []",
+      "A.cover.mask.ld []",
+      "IMG []",
+      "DIV.footer [狂炫不胖低卡奶茶合集（200大卡版）炫我]",
+      "A.title [狂炫不胖低卡奶茶合集（200大卡版）]",
+      "SPAN [狂炫不胖低卡奶茶合集（200大卡版）]",
+      "DIV.card-bottom-wrapper [炫我嘴里（资讯版）03-318252]",
+      "A.author [炫我嘴里（资讯版）03-31]",
+      "SPAN.like-wrapper.like-active [8252]"
+    ]
+  }
+}

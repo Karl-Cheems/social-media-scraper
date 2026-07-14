@@ -1,0 +1,752 @@
+{
+  "url": "https://www.xiaohongshu.com/search_result_ai?keyword=%E5%A5%B6%E8%8C%B6&source=web_search_result_notes&type=51",
+  "bodyClass": "ai-layout-active",
+  "noteCount": 44,
+  "filters": [
+    {
+      "cls": "ai-feeds-page with-ai-chat",
+      "tag": "DIV",
+      "text": "笔记用户用户问点点ai综合悉尼厦门伦敦上",
+      "visible": true,
+      "rect": {
+        "w": 1424,
+        "h": 726,
+        "top": 0,
+        "left": 90
+      }
+    },
+    {
+      "cls": "xhs-ai-chat-header__tag",
+      "tag": "SPAN",
+      "text": "ai",
+      "visible": true,
+      "rect": {
+        "w": 16,
+        "h": 16,
+        "top": 123,
+        "left": 304
+      }
+    },
+    {
+      "cls": "divider with-filter",
+      "tag": "DIV",
+      "text": "",
+      "visible": false,
+      "rect": {
+        "w": 813,
+        "h": 0,
+        "top": 168,
+        "left": 122
+      }
+    },
+    {
+      "cls": "resizable-divider ai-chat-section-divider",
+      "tag": "DIV",
+      "text": "",
+      "visible": true,
+      "rect": {
+        "w": 8,
+        "h": 610,
+        "top": 116,
+        "left": 959
+      }
+    },
+    {
+      "cls": "ai-chat-section",
+      "tag": "DIV",
+      "text": "筛选点点aiai总结53篇笔记生成奶茶可",
+      "visible": true,
+      "rect": {
+        "w": 515,
+        "h": 610,
+        "top": 116,
+        "left": 967
+      }
+    },
+    {
+      "cls": "ai-chat-inner",
+      "tag": "DIV",
+      "text": "筛选点点aiai总结53篇笔记生成奶茶可",
+      "visible": true,
+      "rect": {
+        "w": 483,
+        "h": 610,
+        "top": 116,
+        "left": 999
+      }
+    },
+    {
+      "cls": "filter ai-chat-filter",
+      "tag": "DIV",
+      "text": "筛选",
+      "visible": true,
+      "rect": {
+        "w": 84,
+        "h": 40,
+        "top": 116,
+        "left": 1398
+      }
+    },
+    {
+      "cls": "reds-icon filter-icon",
+      "tag": "svg",
+      "text": "",
+      "visible": true,
+      "rect": {
+        "w": 16,
+        "h": 16,
+        "top": 128,
+        "left": 1450
+      }
+    },
+    {
+      "cls": "xhs-ai-chat-header",
+      "tag": "DIV",
+      "text": "点点ai",
+      "visible": true,
+      "rect": {
+        "w": 483,
+        "h": 44,
+        "top": 156,
+        "left": 999
+      }
+    },
+    {
+      "cls": "xhs-ai-chat-header__left",
+      "tag": "DIV",
+      "text": "点点ai",
+      "visible": true,
+      "rect": {
+        "w": 74,
+        "h": 24,
+        "top": 162,
+        "left": 999
+      }
+    },
+    {
+      "cls": "xhs-ai-chat-header__avatar",
+      "tag": "IMG",
+      "text": "",
+      "visible": true,
+      "rect": {
+        "w": 24,
+        "h": 24,
+        "top": 162,
+        "left": 999
+      }
+    },
+    {
+      "cls": "xhs-ai-chat-header__name",
+      "tag": "SPAN",
+      "text": "点点",
+      "visible": true,
+      "rect": {
+        "w": 34,
+        "h": 14,
+        "top": 167,
+        "left": 1023
+      }
+    },
+    {
+      "cls": "xhs-ai-chat-header__tag",
+      "tag": "SPAN",
+      "text": "ai",
+      "visible": true,
+      "rect": {
+        "w": 16,
+        "h": 16,
+        "top": 166,
+        "left": 1057
+      }
+    },
+    {
+      "cls": "xhs-ai-chat-header__close",
+      "tag": "BUTTON",
+      "text": "",
+      "visible": true,
+      "rect": {
+        "w": 28,
+        "h": 28,
+        "top": 160,
+        "left": 1446
+      }
+    },
+    {
+      "cls": "ai-chat-scroll-body",
+      "tag": "DIV",
+      "text": "ai总结53篇笔记生成奶茶可是大家的“快",
+      "visible": true,
+      "rect": {
+        "w": 483,
+        "h": 526,
+        "top": 200,
+        "left": 999
+      }
+    },
+    {
+      "cls": "xhs-ai-chat-continue",
+      "tag": "DIV",
+      "text": "继续与点点对话",
+      "visible": true,
+      "rect": {
+        "w": 483,
+        "h": 76,
+        "top": 1519,
+        "left": 999
+      }
+    },
+    {
+      "cls": "xhs-ai-chat-continue__btn",
+      "tag": "BUTTON",
+      "text": "继续与点点对话",
+      "visible": true,
+      "rect": {
+        "w": 483,
+        "h": 48,
+        "top": 1531,
+        "left": 999
+      }
+    },
+    {
+      "cls": "xhs-ai-chat-continue__icon",
+      "tag": "svg",
+      "text": "",
+      "visible": true,
+      "rect": {
+        "w": 18,
+        "h": 18,
+        "top": 1546,
+        "left": 1170
+      }
+    },
+    {
+      "cls": "xhs-ai-chat-continue__text",
+      "tag": "SPAN",
+      "text": "继续与点点对话",
+      "visible": true,
+      "rect": {
+        "w": 110,
+        "h": 16,
+        "top": 1547,
+        "left": 1188
+      }
+    },
+    {
+      "cls": "reds-icon xhs-ai-chat-continue__arrow",
+      "tag": "svg",
+      "text": "",
+      "visible": true,
+      "rect": {
+        "w": 14,
+        "h": 14,
+        "top": 1548,
+        "left": 1298
+      }
+    }
+  ],
+  "panels": [
+    {
+      "cls": "popover-container",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 116,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-trigger",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 116,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-container",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 172,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-trigger",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 172,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-container",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 228,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-trigger",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 228,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-container",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 284,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-trigger",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 284,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-container",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 340,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-trigger",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 340,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-container",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 396,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-trigger",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 396,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-container",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 452,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-trigger",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 452,
+        "left": 16
+      },
+      "innerText": ""
+    },
+    {
+      "cls": "popover-container",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 508,
+        "left": 16
+      },
+      "innerText": "我"
+    },
+    {
+      "cls": "popover-trigger",
+      "visible": true,
+      "rect": {
+        "w": 58,
+        "h": 48,
+        "top": 508,
+        "left": 16
+      },
+      "innerText": "我"
+    },
+    {
+      "cls": "ai-chat-section",
+      "visible": true,
+      "rect": {
+        "w": 515,
+        "h": 610,
+        "top": 116,
+        "left": 967
+      },
+      "innerText": "筛选点点aiai总结53篇笔记生成奶茶可是大家的“快乐水”！无论是想点一杯解馋，还是想在家自己动手，都有很多不错的选择。我为你整理了目前最火的奶茶品牌、隐藏点单攻略以及自制教程，快来看看有没有你喜欢的！\n热门品牌“销冠”盘点\n如果你不知道喝什么，可以直接抄这些品牌的“作业”，它们都是各自家的销量王者：\n\n​​喜茶​​：三倍厚抹，抹茶含量极高，入口浓郁回甘，抹茶脑袋必冲。\n​​古茗​​：云里茉莉，茶"
+    },
+    {
+      "cls": "filter ai-chat-filter",
+      "visible": true,
+      "rect": {
+        "w": 84,
+        "h": 40,
+        "top": 116,
+        "left": 1398
+      },
+      "innerText": "筛选"
+    }
+  ],
+  "tags": [],
+  "hpBounds": [
+    {
+      "cls": "channel",
+      "tag": "DIV",
+      "text": "用户",
+      "visible": true,
+      "rect": {
+        "w": 64,
+        "h": 28
+      }
+    },
+    {
+      "cls": "reds-button-new close-icon large icon has-icon pure-icon close-icon",
+      "tag": "BUTTON",
+      "text": "",
+      "visible": true,
+      "rect": {
+        "w": 40,
+        "h": 40
+      }
+    }
+  ],
+  "overlays": [
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 244
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 244
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 185
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 246
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 244
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    },
+    {
+      "cls": "cover mask ld",
+      "rect": {
+        "w": 185,
+        "h": 247
+      }
+    }
+  ]
+}
