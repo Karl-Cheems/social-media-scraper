@@ -179,7 +179,9 @@ async def _scrape_weibo_url(page, context, url: str, max_comments: int) -> dict:
     # 在新 tab 中打开详情页（保持主 tab 干净）
     detail_page = await context.new_page()
     try:
-        await detail_page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        # 去掉 URL 中的 #repost/#comment 等 hash 片段，确保进入正常详情页
+        clean_url = url.split('#')[0]
+        await detail_page.goto(clean_url, wait_until="domcontentloaded", timeout=30000)
         await detail_page.wait_for_timeout(5000)
 
         # 检测登录
@@ -260,12 +262,24 @@ async def _scrape_weibo_url(page, context, url: str, max_comments: int) -> dict:
                 for (var i = 0; i < lines.length; i++) {
                     if (lines[i] === '评论') { commentStart = i + 1; break; }
                 }
-                if (commentStart < 0) return [];
+                if (commentStart < 0) {
+                    // 没找到"评论"标记，改用 DOM 方式：找"按热度"或"按时间"
+                    for (var i = 0; i < lines.length; i++) {
+                        if (lines[i] === '按热度' || lines[i] === '按时间') { commentStart = i; break; }
+                    }
+                    if (commentStart < 0) return [];
+                }
 
                 var idx = commentStart;
+                // 跳过排序标签
                 while (idx < lines.length && (lines[idx] === '按热度' || lines[idx] === '按时间')) idx++;
-
-                idx += 4;
+                // 跳过空行找到第一个用户名（非数字、非日期、非空的行）
+                while (idx < lines.length) {
+                    var l = lines[idx];
+                    if (/^\\d{1,2}-\\d{1,2}/.test(l) || /^\\d{1,2}月/.test(l) || l.indexOf('发布于') >= 0 || l.indexOf('来自') >= 0 || /^\\d+$/.test(l)) {
+                        idx++;
+                    } else { break; }
+                }
 
                 var result = [];
                 var pendingUser = '';
