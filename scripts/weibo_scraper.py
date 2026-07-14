@@ -240,11 +240,32 @@ async def scrape_profile(
                         if detail_nums.get("likes", -1) >= 0:
                             likes = detail_nums["likes"]
 
-                        # 多次滚动以触发评论加载
+                        # 多次滚动以触发评论加载（微博需鼠标定位评论区 + wheel 事件）
                         if fetch_comments:
-                            scroll_rounds = min(30, max(5, max_comments // 4))
+                            # 先定位到"评论"元素，鼠标移到评论区上方
+                            comment_pos = await detail_page.evaluate("""
+                                (() => {
+                                    var els = document.querySelectorAll('*');
+                                    for (var el of els) {
+                                        if (el.children.length === 0 && (el.textContent || '').trim() === '评论') {
+                                            el.scrollIntoView({block: 'start'});
+                                            var r = el.getBoundingClientRect();
+                                            return {top: r.top, left: r.left, bottom: r.bottom};
+                                        }
+                                    }
+                                    return null;
+                                })()
+                            """)
+                            await detail_page.wait_for_timeout(1000)
+                            scroll_rounds = min(60, max(5, max_comments // 2))
+                            # 鼠标移到评论区域再 wheel（微博评论懒加载依赖 wheel 事件，window.scrollBy 无效）
+                            if comment_pos and comment_pos['top'] > 0:
+                                await detail_page.mouse.move(comment_pos['left'] + 50, comment_pos['top'] + 10, steps=3)
                             for _ in range(scroll_rounds):
-                                await detail_page.evaluate("window.scrollBy(0, 1500)")
+                                # 每次先 scrollIntoView 到底部触发懒加载
+                                await detail_page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                                await detail_page.wait_for_timeout(800)
+                                await detail_page.mouse.wheel(0, 300)
                                 await detail_page.wait_for_timeout(800)
 
                             comments_list = await detail_page.evaluate(
@@ -260,8 +281,13 @@ async def scrape_profile(
 
                                     var idx = commentStart;
                                     while (idx < lines.length && (lines[idx] === '按热度' || lines[idx] === '按时间')) idx++;
-
-                                    idx += 4;
+                                    // 跳过空行找到第一个用户名（非数字、非日期、非空的行）
+                                    while (idx < lines.length) {
+                                        var l = lines[idx];
+                                        if (/^\d{1,2}-\d{1,2}/.test(l) || /^\d{1,2}月/.test(l) || l.indexOf('发布于') >= 0 || l.indexOf('来自') >= 0 || /^\d+$/.test(l)) {
+                                            idx++;
+                                        } else { break; }
+                                    }
 
                                     var result = [];
                                     var pendingUser = '';
