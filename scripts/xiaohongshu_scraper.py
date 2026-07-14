@@ -420,7 +420,7 @@ async def scrape_profile(
                     if fetch_comments:
                         await page.wait_for_timeout(1000)
                         try:
-                            comments_list, comment_images = await xhs_expand_comments(page, max_comments)
+                            comments_list, comment_images = await xhs_expand_comments(page, max_comments, container_scroll=True)
                         except Exception:
                             pass
 
