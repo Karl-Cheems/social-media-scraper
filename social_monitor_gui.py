@@ -455,8 +455,8 @@ class SocialMonitorGUI:
         ttk.Spinbox(r2, from_=1, to=20, textvariable=self.kw_per, width=5).pack(side="left", padx=(0, 4))
         ttk.Label(r2, text="条  ").pack(side="left")
         ttk.Label(r2, text="    评论数/条:").pack(side="left", padx=(0, 4))
-        self.kw_max_comments = tk.StringVar(value="30")
-        ttk.Spinbox(r2, from_=0, to=100, textvariable=self.kw_max_comments, width=5).pack(side="left", padx=(0, 4))
+        self.kw_max_comments = tk.StringVar(value="300")
+        ttk.Spinbox(r2, from_=0, to=999, textvariable=self.kw_max_comments, width=5).pack(side="left", padx=(0, 4))
         ttk.Label(r2, text="条").pack(side="left")
 
         r_sort = ttk.Frame(cfg, style="Card.TLabelframe")
@@ -559,8 +559,8 @@ class SocialMonitorGUI:
         self.acc_self_comment = tk.BooleanVar(value=True)
         ttk.Checkbutton(r3, text="获取评论", variable=self.acc_self_comment).pack(side="left", padx=(0, 12))
         ttk.Label(r3, text="评论数/条:").pack(side="left", padx=(0, 4))
-        self.acc_self_max_comments = tk.StringVar(value="30")
-        ttk.Spinbox(r3, from_=0, to=100, textvariable=self.acc_self_max_comments, width=5).pack(side="left", padx=(0, 4))
+        self.acc_self_max_comments = tk.StringVar(value="200")
+        ttk.Spinbox(r3, from_=0, to=999, textvariable=self.acc_self_max_comments, width=5).pack(side="left", padx=(0, 4))
         ttk.Label(r3, text="条").pack(side="left")
 
         r4 = ttk.Frame(cfg, style="Card.TLabelframe")
@@ -626,8 +626,8 @@ class SocialMonitorGUI:
         self.acc_comp_comment = tk.BooleanVar(value=True)
         ttk.Checkbutton(r3, text="获取评论", variable=self.acc_comp_comment).pack(side="left", padx=(0, 12))
         ttk.Label(r3, text="评论数/条:").pack(side="left", padx=(0, 4))
-        self.acc_comp_max_comments = tk.StringVar(value="30")
-        ttk.Spinbox(r3, from_=0, to=100, textvariable=self.acc_comp_max_comments, width=5).pack(side="left", padx=(0, 4))
+        self.acc_comp_max_comments = tk.StringVar(value="200")
+        ttk.Spinbox(r3, from_=0, to=999, textvariable=self.acc_comp_max_comments, width=5).pack(side="left", padx=(0, 4))
         ttk.Label(r3, text="条").pack(side="left")
 
         r4 = ttk.Frame(cfg, style="Card.TLabelframe")
@@ -738,8 +738,8 @@ class SocialMonitorGUI:
         r2 = ttk.Frame(cfg, style="Card.TLabelframe")
         r2.pack(fill="x", pady=(6, 0))
         ttk.Label(r2, text="评论数量:").pack(side="left", padx=(0, 8))
-        self.detail_comments = tk.StringVar(value="30")
-        ttk.Spinbox(r2, from_=1, to=100, textvariable=self.detail_comments, width=6).pack(side="left", padx=(0, 24))
+        self.detail_comments = tk.StringVar(value="999")
+        ttk.Spinbox(r2, from_=1, to=999, textvariable=self.detail_comments, width=6).pack(side="left", padx=(0, 24))
 
         r3 = ttk.Frame(cfg, style="Card.TLabelframe")
         r3.pack(fill="x", pady=(6, 8))
