@@ -246,7 +246,12 @@ async def scrape_profile(
                     if (!coverLink) continue;
                     const href = coverLink.getAttribute('href') || '';
                     const url = href.startsWith('http') ? href : 'https://www.xiaohongshu.com' + href;
-                    const isPinned = (card.textContent || '').indexOf('置顶') >= 0;
+                    // 置顶检测：仅当卡片有专门的置顶标记（如红色角标或特定位置图标）时才标为置顶
+                    // 使用逐元素文本匹配代替全 card.textContent 匹配，避免页面其他 UI 文字误判
+                    const isPinned = Array.from(card.querySelectorAll(':scope > *')).some(function(el) {
+                        var t = (el.textContent || '').trim();
+                        return t === '置顶' || t.startsWith('置顶');
+                    });
 
                     let pubTime = '';
                     const footerEl = card.querySelector('.footer, [class*="footer"], [class*="date"], [class*="time"]');

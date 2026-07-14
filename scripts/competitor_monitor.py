@@ -97,14 +97,12 @@ async def scrape_account(identifier: str, limit: int, fetch_comments: bool,
         }
 
     elif platform == 'xiaohongshu':
-        # 小红书限 50 条
-        xhs_max = min(max_comments, 50)
         result = await xiaohongshu_scraper.scrape_profile(
             profile_url=profile_url,
             limit=limit,
             headless=headless,
             fetch_comments=fetch_comments,
-            max_comments=xhs_max,
+            max_comments=max_comments,
             no_content=no_content,
         )
         return {
