@@ -763,6 +763,7 @@ async def search_keywords(
     sort_by: str = "likes",
     content_type: str = "all",
     headless: bool = False,
+    account: str | None = None,
 ) -> dict:
     """多关键词多平台搜索。总是进入详情页提取完整正文和评论。
     Args:
@@ -782,11 +783,9 @@ async def search_keywords(
     collected_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     platform_results = []
 
-    edge_user_data = get_edge_user_data()
-
     async with async_playwright() as p:
         context, page, _tmpdir = await launch_browser(
-            p, headless=headless, user_data_dir=edge_user_data, label="keyword_search"
+            p, headless=headless, label="keyword_search", account=account
         )
 
         try:
@@ -889,9 +888,10 @@ def main():
     parser = argparse.ArgumentParser(
         description="关键词采集工具 — 微博 & 小红书"
     )
+    parser.add_argument("--account", default=None, help="使用的账号ID（BrowserManager 管理）")
     parser.add_argument(
         "--keywords", "-k", type=str, required=True,
-        help="搜索关键词，多个用逗号分隔，如：元气森林,气泡水",
+        help="搜索关键词，多个用逗号分隔，如：元气森林、气泡水",
     )
     parser.add_argument(
         "--platforms", "-p", type=str, default="both",
@@ -954,6 +954,7 @@ def main():
         sort_by=args.sort_by,
         content_type=args.content_type,
         headless=False,
+        account=args.account,
     ))
 
     write_output(result, args.output)

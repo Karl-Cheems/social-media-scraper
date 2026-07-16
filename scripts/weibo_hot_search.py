@@ -48,13 +48,13 @@ async def scrape_hot_search(
     limit: int = 10,
     board: str = "hot",
     headless: bool = False,
+    account: str | None = None,
 ) -> list[TopicDetail]:
     """采集微博热搜榜/文娱榜，及各话题下的智搜回答。"""
     results = []
-    edge_user_data = get_edge_user_data()
 
     async with async_playwright() as p:
-        context, page, _tmpdir = await launch_browser(p, headless=headless, user_data_dir=edge_user_data, label="weibo_hot")
+        context, page, _tmpdir = await launch_browser(p, headless=headless, label="weibo_hot", account=account)
 
         try:
             # 第一阶段：获取榜单
@@ -344,6 +344,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="微博热搜/文娱监控工具 - 采集榜单及智搜回答"
     )
+    parser.add_argument("--account", default=None, help="使用的账号ID（BrowserManager 管理）")
     parser.add_argument("--limit", type=int, default=10, help="采集数量上限（默认 10）")
     parser.add_argument("--board", default="hot",
                         choices=["hot", "entertainment", "both"],
@@ -359,6 +360,7 @@ def main():
                 limit=args.limit,
                 board=b,
                 headless=False,
+                account=args.account,
             ))
             for t in batch:
                 t.board = b
@@ -371,6 +373,7 @@ def main():
             limit=args.limit,
             board=args.board,
             headless=False,
+            account=args.account,
         ))
 
     from datetime import datetime

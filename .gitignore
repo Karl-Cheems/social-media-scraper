@@ -1,19 +1,34 @@
-_gui_*.json
-社交监控工具.exe
-*.exe
+# Python
 __pycache__/
 *.pyc
-.claude/skills/lark-shared/lark-cli.exe
-.claude/skills/lark-shared/qr_login.png
+*.pyo
 .env
+.venv/
+env/
+
+# Build
 build/
 dist/
 *.spec
+*.exe
+
+# Data (runtime generated)
 data/
+
+# Testing artifacts
+tests/*.py
 tmp_ui_test/
 tmpug*
-*.txt
 probe_output*
-test_comment_result*
 check_note*
+test_comment_result*
+
+# Playwright tips
 playwright-tips.md
+
+# Claude
+.claude/skills/lark-shared/lark-cli.exe
+.claude/skills/lark-shared/qr_login.png
+
+# Web temp files
+_web_*.json

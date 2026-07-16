@@ -1,23 +1,24 @@
-# 社交媒体监控工具
+# 社交媒体监控平台
 
-基于 Playwright + Edge 浏览器的社交媒体内容自动采集工具，支持微博、小红书、抖音三大平台。
+基于 Playwright + Edge 浏览器的社交媒体内容自动采集 Web 服务，支持微博、小红书、抖音三大平台。
 
 ## 功能
 
+- **🔑 多租户登录** — 每个实例独立注册/登录，独立的 Edge 浏览器和 Agent 配置
 - **🔥 热搜监控** — 微博热搜榜/文娱榜、抖音热榜实时采集
-- **🔍 关键词搜索** — 按产品线 + 关键词在小红书/微博批量搜索
-- **🏠 自有账号监控** — 元气森林自有账号内容采集
-- **🏢 竞品账号监控** — 从 URL 文件读取竞品账号列表，批量采集
-- **📝 内容详情采集** — 单条微博/小红书内容详情 + 评论
-- **⏰ 定时轮询** — 支持按规则定时自动执行采集任务
-- **🤖 AI Agent 推送** — 采集结果自动推送至 AI Agent
+- **🔍 关键词搜索** — 按产品线 + 关键词在小红书/微博搜索
+- **🏢 账号监控** — 竞品品牌账号内容批量采集
+- **📝 定向内容分析** — 单条微博/小红书内容详情 + 评论
+- **🔐 账号管理** — 每个实例可绑定多个平台账号，各自扫码登录
+- **🤖 AI Agent 推送** — 采集结果自动推送至 RPC Agent
 
 ## 目录结构
 
 ```
-├── main.py                    # 程序入口
+├── web_server.py              # Web 服务主入口
 ├── scripts/                   # 采集脚本（后端逻辑）
-│   ├── common.py              # 公共工具（浏览器启动、输出、评论展开）
+│   ├── browser_manager.py     # 浏览器实例管理器
+│   ├── common.py              # 公共工具（浏览器启动、评论展开）
 │   ├── keyword_search.py      # 关键词搜索
 │   ├── weibo_hot_search.py    # 微博热搜
 │   ├── douyin_hot_search.py   # 抖音热榜
@@ -26,22 +27,17 @@
 │   ├── url_detail.py          # 内容详情采集
 │   ├── weibo_scraper.py       # 微博爬虫核心
 │   └── xiaohongshu_scraper.py # 小红书爬虫核心
+├── web/templates/index.html   # Web 前端（单页应用）
 ├── notify/                    # 推送模块
-│   ├── notify_feishu.py       # 飞书卡片推送
 │   └── notify_agent.py        # AI Agent 推送
 ├── config/                    # 配置文件
 │   ├── keywords.json          # 产品线 + 关键词配置
 │   ├── urls.txt               # 竞品账号 URL 列表
-│   └── schedule_rules.json    # 定时轮询规则
-├── tests/                     # 测试脚本
-├── docs/                      # 设计文档
-│   └── superpowers/
+│   └── schedule_rules.json    # 定时轮询规则（当前为空）
 ├── data/                      # 采集输出数据（gitignored）
-├── dist/                      # 打包产物（gitignored）
 ├── .env                       # 本地环境变量
-├── .env.example               # 环境变量示例
-├── 社交监控工具.spec           # PyInstaller 打包配置
-└── 一键部署.bat               # 部署脚本
+├── requirements.txt           # Python 依赖
+└── README.md                  # 本文件
 ```
 
 ## 快速开始
@@ -50,43 +46,56 @@
 
 - Python 3.12+
 - Microsoft Edge 浏览器
-- 微博/小红书账号（用于登录）
 
 ### 安装
 
 ```bash
 pip install -r requirements.txt
-playwright install msedge
+playwright install chromium
 ```
 
 ### 配置
 
-1. 复制 `.env.example` 为 `.env`，配置飞书 Webhook、AI Agent 等信息
-2. （可选）编辑 `config/urls.txt` 配置竞品账号列表
-3. （可选）编辑 `config/keywords.json` 配置搜索关键词
+编辑 `config/keywords.json` 配置搜索关键词。
 
-### 运行
-
-```bash
-python main.py                # 启动图形界面
-python main.py --lang en       # 指定语言
+编辑 `config/urls.txt` 配置竞品账号列表，格式：
+```
+# === 品牌名称 ===
+小红书号（纯数字）或 weibo.com/xxx
 ```
 
-也可直接运行单个采集脚本：
+### 启动
 
 ```bash
-python scripts/keyword_search.py --keywords "气泡水" --platforms xiaohongshu
-python scripts/weibo_hot_search.py --limit 10
+python web_server.py
 ```
 
-### 打包为单文件
+服务启动后访问 http://localhost:5050，注册实例后即可使用。
+
+### 启动选项
 
 ```bash
-py -3.12 -m PyInstaller 社交监控工具.spec
+python web_server.py --port 5050          # 指定端口
+python web_server.py --host 0.0.0.0       # 指定监听地址
+python web_server.py --debug              # 调试模式
 ```
+
+## 使用流程
+
+1. **注册实例** — 设置实例名称、密码、RPC 地址、Sender ID
+2. **添加平台账号** — 在实例配置中添加小红书/微博/抖音账号
+3. **扫码登录** — 点击账号后的「扫码登录」，用手机 App 扫描二维码
+4. **提交任务** — 在热搜/关键词/账号监控页面提交采集任务
+5. **查看结果** — 任务完成后自动推送至 RPC Agent
+
+## 架构说明
+
+- 每个实例 = 一个独立的 Edge 浏览器进程 + CDP 端口 + User Data 目录
+- 一个实例可以绑定多个平台账号（小红书/微博/抖音），各自扫码登录，cookies 保存在实例的 Edge profile 中
+- 同实例的任务串行执行，不同实例的任务并行执行
+- 任务提交前自动检查对应平台的登录状态，未登录则引导扫码
 
 ## 注意事项
 
-- 首次使用时需要在弹出的浏览器窗口中登录微博/小红书
-- Edge 浏览器用户数据目录默认在 `%LOCALAPPDATA%/Microsoft/Edge/User Data`
-- 采集频率过高可能触发平台风控，脚本已内置随机延迟
+- 各平台均需通过手机 App 扫码登录，没有密码登录入口
+- 采集频率过高可能触发平台风控，脚本内置随机延迟

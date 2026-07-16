@@ -53,14 +53,14 @@ async def scrape_profile(
     headless: bool = False,
     fetch_comments: bool = False,
     max_comments: int = 10,
+    account: str | None = None,
 ) -> ProfileResult:
     """打开微博账号主页，采集该账号发布的微博数据。"""
     weibos = []
     author_name = ""
-    edge_user_data = get_edge_user_data()
 
     async with async_playwright() as p:
-        context, page, _tmpdir = await launch_browser(p, headless=headless, user_data_dir=edge_user_data, label="weibo_scraper")
+        context, page, _tmpdir = await launch_browser(p, headless=headless, label="weibo_scraper", account=account)
 
         try:
             print(f"正在打开用户主页: {profile_url}", file=sys.stderr)
@@ -509,6 +509,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="微博账号内容运营数据采集工具"
     )
+    parser.add_argument("--account", default=None, help="使用的账号ID（BrowserManager 管理）")
     parser.add_argument("--limit", "-n", type=int, default=10, help="采集微博数量上限")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
     parser.add_argument("--comments", action="store_true", help="同时采集评论内容")
@@ -527,6 +528,7 @@ def main():
         headless=False,
         fetch_comments=args.comments,
         max_comments=args.max_comments,
+        account=args.account,
     ))
 
     output = result.model_dump(mode="json")

@@ -53,7 +53,8 @@ def _build_profile_url(identifier: str) -> str:
 
 async def scrape_account(identifier: str, limit: int, fetch_comments: bool,
                          max_comments: int, headless: bool = False,
-                         no_content: bool = False) -> dict:
+                         no_content: bool = False,
+                         account: str | None = None) -> dict:
     """采集单个账号的数据，返回统一格式的 dict。"""
     platform = detect_platform(identifier)
     profile_url = _build_profile_url(identifier)
@@ -65,6 +66,7 @@ async def scrape_account(identifier: str, limit: int, fetch_comments: bool,
             headless=headless,
             fetch_comments=fetch_comments,
             max_comments=max_comments,  # 微博 60 条
+            account=account,
         )
         return {
             "platform": "weibo",
@@ -104,6 +106,7 @@ async def scrape_account(identifier: str, limit: int, fetch_comments: bool,
             fetch_comments=fetch_comments,
             max_comments=max_comments,
             no_content=no_content,
+            account=account,
         )
         return {
             "platform": "xiaohongshu",
@@ -156,6 +159,7 @@ def main():
     parser.add_argument("--max-comments", type=int, default=60, help="每条内容最多采集评论数（默认 60，微博 60/条，小红书 50/条）")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
     parser.add_argument("--visible", action="store_true", help="显示浏览器窗口（默认隐藏）")
+    parser.add_argument("--account", default=None, help="使用的账号ID（BrowserManager 管理）")
 
     args = parser.parse_args()
 
@@ -188,8 +192,9 @@ def main():
                     limit=args.limit,
                     fetch_comments=not args.no_comments,
                     max_comments=args.max_comments,
-                    headless=False,
+                    headless=not args.visible,
                     no_content=args.no_content,
+                    account=args.account,
                 )
                 results.append(account_data)
                 print(f"  ✓ 完成: {account_data['author']} ({account_data['total_collected']} 条)", file=sys.stderr)

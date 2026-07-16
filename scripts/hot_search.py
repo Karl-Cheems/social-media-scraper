@@ -38,6 +38,7 @@ def main():
                         help="微博榜单: hot=热搜, entertainment=文娱, both=两者（默认 both）")
     parser.add_argument("--douyin-limit", type=int, default=10, help="抖音热榜数量（默认 10）")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
+    parser.add_argument("--account", default=None, help="使用的账号ID（BrowserManager 管理）")
 
     args = parser.parse_args()
 
@@ -61,6 +62,7 @@ def main():
         dy_results = asyncio.run(dy.scrape_hot_search(
             limit=douyin_limit,
             headless=headless,
+            account=args.account,
         ))
         dy_output = {
             "platform": "douyin",
@@ -97,6 +99,7 @@ def main():
                 limit=weibo_limit,
                 board=b,
                 headless=headless,
+                account=args.account,
             ))
             wb_output = {
                 "platform": "weibo",

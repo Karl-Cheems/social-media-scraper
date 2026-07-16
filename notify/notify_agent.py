@@ -11,6 +11,7 @@
 
 import argparse
 import json
+import math
 import os
 import sys
 from datetime import datetime
@@ -266,6 +267,16 @@ def build_summary(data: dict, data_type: str) -> str:
     return "\n".join(lines)
 
 
+def sanitize_json(value):
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {str(k): sanitize_json(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [sanitize_json(v) for v in value]
+    return value
+
+
 def send(data: dict, server_url: str, sender_id: str, chat_id: str,
          source_type: str | None = None,
          prefix: str | None = None) -> bool:
@@ -278,11 +289,12 @@ def send(data: dict, server_url: str, sender_id: str, chat_id: str,
         chat_id: 会话 ID
         source_type: 来源类型 (self/competitor/keyword/hot)，None 则自动识别
     """
+    data = sanitize_json(data)
     data_type = detect_type(data)
     data_type_key = source_type or detect_type_key(data)
 
     # 把原始 JSON 转为文本
-    raw_json_text = json.dumps(data, ensure_ascii=False, indent=2)
+    raw_json_text = json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False)
 
     payload = {
         "channel": "feishu",

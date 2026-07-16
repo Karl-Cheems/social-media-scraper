@@ -39,12 +39,12 @@ HOT_SEARCH_URL = "https://www.douyin.com/hot"
 async def scrape_hot_search(
     limit: int = 10,
     headless: bool = False,
+    account: str | None = None,
 ) -> list[HotItem]:
     """采集抖音热搜榜单。"""
-    edge_user_data = get_edge_user_data()
 
     async with async_playwright() as p:
-        context, page, _tmpdir = await launch_browser(p, headless=False, user_data_dir=edge_user_data, label="douyin")
+        context, page, _tmpdir = await launch_browser(p, headless=False, label="douyin", account=account)
 
         try:
             print(f"正在打开热搜榜: {HOT_SEARCH_URL}", file=sys.stderr)
@@ -143,6 +143,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="抖音热搜监控工具 - 采集抖音热搜榜单"
     )
+    parser.add_argument("--account", default=None, help="使用的账号ID（BrowserManager 管理）")
     parser.add_argument("--limit", type=int, default=10, help="采集热搜数量上限（默认 10）")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
 
@@ -151,6 +152,7 @@ def main():
     results = asyncio.run(scrape_hot_search(
         limit=args.limit,
         headless=False,
+        account=args.account,
     ))
 
     from datetime import datetime

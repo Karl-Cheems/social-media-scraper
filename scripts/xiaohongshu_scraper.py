@@ -73,15 +73,15 @@ async def scrape_profile(
     fetch_comments: bool = True,
     max_comments: int = 10,
     no_content: bool = False,
+    account: str | None = None,
 ) -> ProfileResult:
     """模拟真实用户操作：进 explore → 搜索用户 ID → 点用户卡片 → 进入主页 → 点笔记详情 → 后退"""
     notes = []
     author_name = ""
-    edge_user_data = get_edge_user_data()
     user_id = profile_url.rstrip('/').split('/')[-1].split('?')[0]
 
     async with async_playwright() as p:
-        context, page, _tmpdir = await launch_browser(p, headless=False, user_data_dir=edge_user_data, label="xiaohongshu")
+        context, page, _tmpdir = await launch_browser(p, headless=False, label="xiaohongshu", account=account)
 
         try:
             # ── 步骤 1：打开 explore ──────────────────────
@@ -483,6 +483,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="小红书账号内容运营数据采集工具"
     )
+    parser.add_argument("--account", default=None, help="使用的账号ID（BrowserManager 管理）")
     parser.add_argument("--limit", "-n", type=int, default=10, help="采集笔记数量上限")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
     parser.add_argument("--no-content", action="store_true", help="不获取笔记正文（默认获取）")
@@ -504,6 +505,7 @@ def main():
         fetch_comments=not args.no_comments,
         max_comments=args.max_comments,
         no_content=args.no_content,
+        account=args.account,
     ))
 
     output = result.model_dump(mode="json")

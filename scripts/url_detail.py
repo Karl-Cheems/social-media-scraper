@@ -35,13 +35,12 @@ def detect_platform(url: str) -> str:
     return "unknown"
 
 
-async def scrape_url_detail(url: str, max_comments: int = 30, headless: bool = False) -> dict:
+async def scrape_url_detail(url: str, max_comments: int = 30, headless: bool = False, account: str | None = None) -> dict:
     """抓取单条 URL 的内容详情（正文、互动量、评论）。"""
     platform = detect_platform(url)
-    edge_user_data = get_edge_user_data()
 
     async with async_playwright() as p:
-        context, page, _tmpdir = await launch_browser(p, headless=headless, user_data_dir=edge_user_data, label="url_detail")
+        context, page, _tmpdir = await launch_browser(p, headless=headless, label="url_detail", account=account)
 
         try:
             if platform == "xiaohongshu":
@@ -75,24 +74,22 @@ async def _scrape_xhs_url(page, context, url: str, max_comments: int) -> dict:
     except Exception:
         pass
 
-    # 检测反爬并重试
-    for _ in range(2):
+    # 检测反爬并重试（最多 3 次）
+    xsec_token = re.search(r'xsec_token=([^&]+)', url)
+    for retry in range(3):
         adblock = await page.evaluate(
             "document.body.innerText.indexOf('广告屏蔽插件') >= 0 || document.body.innerText.indexOf('您的浏览器似乎开') >= 0"
         )
-        if adblock:
-            print("  详情页被反爬拦截，重试...", file=sys.stderr)
-            # goto 重新打开
-            xsec_match2 = re.search(r'xsec_token=([^&]+)', url)
-            goto_url2 = f"https://www.xiaohongshu.com/explore/{note_id}?xsec_token={xsec_match2.group(1)}&xsec_source=pc_search" if xsec_match2 else f"https://www.xiaohongshu.com/explore/{note_id}"
-            await page.goto(goto_url2, wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(5000)
-            try:
-                await page.wait_for_load_state("networkidle", timeout=10000)
-            except Exception:
-                pass
-        else:
+        if not adblock:
             break
+        print(f"  详情页被反爬拦截，重试 ({retry+1}/3)...", file=sys.stderr)
+        xsec = f"?xsec_token={xsec_token.group(1)}&xsec_source=pc_search" if xsec_token else ""
+        await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}{xsec}", wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_timeout(5000)
+        try:
+            await page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
     else:
         print("  ❌ 重试后仍被反爬拦截", file=sys.stderr)
         return {"error": "被反爬拦截", "url": url, "platform": "xiaohongshu"}
@@ -343,6 +340,7 @@ async def _scrape_weibo_url(page, context, url: str, max_comments: int) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="单条 URL 详情采集")
+    parser.add_argument("--account", default=None, help="使用的账号ID（BrowserManager 管理）")
     parser.add_argument("--url", required=True, help="小红书/微博内容 URL")
     parser.add_argument("--max-comments", type=int, default=30, help="最多采集评论数（默认 30）")
     parser.add_argument("--output", "-o", default=None, help="输出 JSON 文件路径")
@@ -351,7 +349,7 @@ def main():
     print(f"采集 URL: {args.url}", file=sys.stderr)
     print(f"最大评论: {args.max_comments}", file=sys.stderr)
 
-    result = asyncio.run(scrape_url_detail(args.url, max_comments=args.max_comments))
+    result = asyncio.run(scrape_url_detail(args.url, max_comments=args.max_comments, account=args.account))
 
     from datetime import datetime
     output = {

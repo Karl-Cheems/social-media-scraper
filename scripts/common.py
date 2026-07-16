@@ -12,6 +12,7 @@
 
 import asyncio
 import json
+import math
 import os
 import random
 import re as _re
@@ -24,6 +25,7 @@ import time as _time
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
+from browser_manager import browser_manager as _bm
 from pydantic import BaseModel, Field
 from playwright._impl._errors import TargetClosedError
 
@@ -76,6 +78,8 @@ _XHS_EXTRACT_COMMENTS_JS = """
         for (var i = 0; i < imgs.length; i++) {
             var img = imgs[i];
             if (img.classList.contains('avatar-item')) continue;
+            // 排除子回复区域——子回复的图在后面单独算，避免重复
+            if (img.closest('.reply-container')) continue;
             var rect = img.getBoundingClientRect();
             if (rect.width < 40 || rect.height < 40) continue;
             count++;
@@ -127,6 +131,20 @@ _XHS_EXTRACT_COMMENTS_JS = """
 """
 
 
+async def xhs_risk_reason(page) -> str | None:
+    """返回小红书页面上的强风控提示；供长任务及时中止。"""
+    try:
+        return await page.evaluate("""() => {
+            const text = (document.body?.innerText || '').replace(/\\s+/g, ' ');
+            const phrases = ['请完成安全验证','请先完成验证','访问过于频繁','操作过于频繁',
+                '请求过于频繁','账号存在异常','网络环境存在风险','拖动滑块','滑块验证',
+                '人机验证','手机刷脸验证','完成身份验证','请完成身份验证'];
+            return phrases.find(x => text.includes(x)) || null;
+        }""")
+    except Exception:
+        return None
+
+
 async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80):
     """在小红书详情页面滚动加载评论并依次点击子回复展开按钮。
 
@@ -144,21 +162,43 @@ async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80):
     if not await container.is_visible(timeout=3000):
         return [], 0
     await container.hover()
-    await page.wait_for_timeout(300)
+    pacing = os.environ.get("SOCIAL_MONITOR_XHS_PACING", "balanced").strip().lower()
+    conservative = pacing == "conservative"
+    fast = pacing == "fast"
+
+    def pacing_range(conservative_range, balanced_range, fast_range):
+        if conservative:
+            return conservative_range
+        if fast:
+            return fast_range
+        return balanced_range
+
+    await page.wait_for_timeout(random.randint(*pacing_range(
+        (2200, 4200), (700, 1300), (250, 600)
+    )))
 
     prev_cnt = 0
     stale_rounds = 0
     scroll_step = 500  # 步长适中，触发懒加载
     max_rounds_effective = max(max_rounds, max_comments // 3 + 10)  # 自动计算足够轮次
 
-    for _ in range(max_rounds_effective):
-        # 第一步：短等再操作
-        await page.wait_for_timeout(random.randint(400, 800))
+    for round_no in range(max_rounds_effective):
+        reason = await xhs_risk_reason(page)
+        if reason:
+            print(f"RISK_DETECTED:小红书需要人工验证：{reason}", file=sys.stderr, flush=True)
+            raise RuntimeError(f"小红书触发风控，需要人工处理：{reason}")
+
+        # Web 保守模式：随机等待，避免连续、等频率滚动。
+        await page.wait_for_timeout(random.randint(*pacing_range(
+            (2800, 5600), (700, 1500), (250, 700)
+        )))
 
         # 第二步：点展开（每轮只点一个）
         clicked = await page.evaluate(_XHS_EXPAND_JS)
         if clicked:
-            await page.wait_for_timeout(random.randint(800, 1500))
+            await page.wait_for_timeout(random.randint(*pacing_range(
+                (3500, 7000), (1000, 2200), (500, 1100)
+            )))
 
         # 第三步：检查计数
         current_cnt = await page.evaluate(
@@ -171,11 +211,14 @@ async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80):
         if current_cnt == prev_cnt:
             if not clicked:
                 stale_rounds += 1
-                if stale_rounds >= 8:
+                stale_limit = 4 if conservative else 8
+                if stale_rounds >= stale_limit:
                     # 卡住后加大步长尝试一下再放弃
                     if scroll_step < 800:
                         scroll_step = 800
                         stale_rounds = 0
+                        if conservative:
+                            await page.wait_for_timeout(random.randint(12000, 22000))
                         continue
                     break
         else:
@@ -197,9 +240,19 @@ async def xhs_expand_comments(page, max_comments: int, max_rounds: int = 80):
                 }}
             }})()
         """)
-        await page.wait_for_timeout(random.randint(600, 1000))
+        await page.wait_for_timeout(random.randint(*pacing_range(
+            (4500, 8500), (900, 1900), (350, 850)
+        )))
+        if conservative and (round_no + 1) % 4 == 0:
+            await page.wait_for_timeout(random.randint(12000, 22000))
+        elif fast and (round_no + 1) % 20 == 0:
+            await page.wait_for_timeout(random.randint(1200, 2500))
+        elif not conservative and not fast and (round_no + 1) % 10 == 0:
+            await page.wait_for_timeout(random.randint(3000, 6000))
 
-    await page.wait_for_timeout(1500)
+    await page.wait_for_timeout(random.randint(*pacing_range(
+        (3500, 6500), (700, 1400), (300, 700)
+    )))
     result = await page.evaluate(_XHS_EXTRACT_COMMENTS_JS, max_comments)
     return result.get("comments", []), result.get("total_comment_images", 0)
 
@@ -325,8 +378,8 @@ def kill_edge():
 async def wait_for_login(page, timeout: int = 300, check_interval: float = 1.5):
     """等待用户完成登录。
 
-    每 1.5 秒检测一次页面内容，判断是否还在登录状态。
-    支持小红书和微博的登录检测。
+    每 1.5 秒检测一次页面内容，判断登录状态是否已改变。
+    支持小红书、微博和抖音的登录检测。
     超时时间默认 300 秒（5 分钟）。
 
     Args:
@@ -338,32 +391,63 @@ async def wait_for_login(page, timeout: int = 300, check_interval: float = 1.5):
     for _ in range(int(timeout / check_interval)):
         await asyncio.sleep(check_interval)
         try:
-            # 检测页面是否还在登录状态（小红书/微博的登录弹窗）
             still_login = await page.evaluate("""() => {
-                // 检查 URL 是否在登录页
-                var url = location.href;
-                if (url.indexOf('login') >= 0 || url.indexOf('passport') >= 0) return true;
+                var url = location.href || '';
+                var bodyText = (document.body && document.body.innerText) || '';
+                var html = document.documentElement ? document.documentElement.outerHTML : '';
 
-                // 检查页面是否有登录弹窗/蒙层（小红书登录弹窗特征）
-                var dialog = document.querySelector('.login-dialog, [class*=login], [class*=passport], .xhs-login, .weibo-login');
-                if (dialog && dialog.offsetParent !== null) return true;
+                // 1) 检测是否被重定向到登录页
+                if (/passport\\.weibo\\.com|login\\.sina|passport\\.xiaohongshu|login\\.douyin/.test(url)) {
+                    return true;
+                }
 
-                // 检查有没有登录按钮（还没登录）
-                var loginBtn = document.querySelector('[class*=login-btn], [class*=to-login]');
-                if (loginBtn && loginBtn.offsetParent !== null) return true;
+                // 2) 小红书 adblock 遮罩检测
+                if (bodyText.indexOf('广告屏蔽插件') >= 0 || bodyText.indexOf('您的浏览器似乎开') >= 0) {
+                    return true;  // 仍然显示拦截遮罩
+                }
 
-                // 检查是否能看到内容（说明已经登录了）
-                var feeds = document.querySelector('.feeds-page, [class*=feed], [class*=note-item], [class*=home-container]');
-                if (feeds) return false;
+                // 3) 检测是否有明显的登录弹窗元素（可见的）
+                var dialogs = document.querySelectorAll(
+                    '.login-dialog, .xhs-login, .weibo-login, ' +
+                    '[class*=login-container], [class*=login-box], ' +
+                    '[class*=qr-code], [class*=qrcode]'
+                );
+                for (var d of dialogs) {
+                    try {
+                        var rect = d.getBoundingClientRect();
+                        if (rect.width > 50 && rect.height > 50) return true;
+                    } catch(e) {}
+                }
 
-                return false; // 默认认为已登录
+                // 4) 检测是否有可见的内容装载完成（登录后才有的）
+                var feedItems = document.querySelectorAll(
+                    '[class*=feed-item], [class*=note-item], [class*=card-wrap], ' +
+                    '[class*=hot-container], [class*=hot-list], ' +
+                    '.feeds-page, [class*=home-container]'
+                );
+                var hasFeed = false;
+                for (var f of feedItems) {
+                    try {
+                        var r = f.getBoundingClientRect();
+                        if (r.width > 100 && r.height > 50) { hasFeed = true; break; }
+                    } catch(e) {}
+                }
+                if (hasFeed) return false;
+
+                // 5) 看 URL 是否回到正常页面（不是 login/passport）
+                if (!/passport|login|signin|sso/.test(url) && hasFeed === false) {
+                    // 不确定，保守返回 true 继续等待
+                    return true;
+                }
+
+                return true; // 默认还在等
             }""")
 
             if not still_login:
                 print("  ✅ 检测到登录成功，继续执行", file=sys.stderr)
                 return True
-        except Exception:
-            # 页面可能在加载中，忽略
+        except Exception as e:
+            # 页面可能在加载/导航中，忽略
             pass
 
     print("  ⚠️ 等待登录超时（5分钟），请重启工具后重试", file=sys.stderr)
@@ -440,18 +524,68 @@ def _edge_lock_clear():
 async def launch_browser(
     p,
     headless: bool,
-    user_data_dir: str,
+    user_data_dir: str | None = None,
     label: str = "app",
+    account: str | None = None,
 ) -> tuple:
-    """用 CDP 连接 Edge 浏览器。多进程共享同一个 Edge 实例。
+    """用 CDP 连接 Edge 浏览器。
 
-    核心逻辑：
-      1. 检查锁文件 → 已有 Edge 在运行 → 直接 CDP 连接，不杀进程
-      2. 没有锁 → 启动新 Edge → 写入锁文件
+    支持两种模式：
+      1. account 模式：通过 BrowserManager 连接指定账号的已有 Edge 实例
+      2. 传统模式（无 account）：通过锁文件共享/自启动 Edge（向后兼容）
+
+    Args:
+        account: 账号 ID（必传之一），从 BrowserManager 获取连接端点
+        user_data_dir: 仅无 account 时使用
 
     Returns:
         (context, page, edge_process) 元组
     """
+    # ── Account 模式：连接 BrowserManager 管理的已有 Edge ──
+    if account:
+        endpoint = _bm.get_endpoint(account, retry=3)
+        if not endpoint:
+            # Edge 可能已死，尝试自动重启
+            print(f"  ⚠️ 账号「{account}」Edge 端口不通，尝试自动重启...", file=sys.stderr)
+            try:
+                await _bm.start_account(account)
+                print(f"  ✅ 账号「{account}」Edge 已自动重启", file=sys.stderr)
+            except Exception as e2:
+                raise RuntimeError(f"自动重启账号 {account} 失败: {e2}")
+            # 重启后再试
+            endpoint = _bm.get_endpoint(account, retry=3)
+            if not endpoint:
+                raise RuntimeError(f"账号 {account} 的 Edge 重启后仍不可用，请先在 Web 管理页面重新启动")
+        print(f"  🔗 连接账号「{account}」Edge（{endpoint}）", file=sys.stderr)
+        for i in range(5):
+            try:
+                browser = await p.chromium.connect_over_cdp(endpoint)
+                break
+            except Exception as e:
+                if i < 4:
+                    await asyncio.sleep(2)
+        else:
+            raise RuntimeError(f"连接账号 {account} 的 Edge 失败（5次重试后放弃）")
+
+        context = browser.contexts[0] if browser.contexts else await browser.new_context()
+        pages = context.pages
+        if pages:
+            first_page = pages[0]
+            for cp in pages[1:]:
+                try:
+                    await cp.close()
+                except Exception:
+                    pass
+            try:
+                await first_page.goto("about:blank", wait_until="commit", timeout=10000)
+            except Exception:
+                pass
+            page = first_page
+        else:
+            page = await context.new_page()
+        return context, page, None
+
+    # ── 传统模式（无 account）：原逻辑 ──
     edge_exe = _find_edge_exe()
     if not edge_exe:
         raise FileNotFoundError("找不到 Edge 浏览器，请确认已安装 Microsoft Edge")
@@ -811,6 +945,19 @@ def get_edge_user_data() -> str:
 # ---------- 数据输出 ----------
 
 
+def sanitize_json(value):
+    """递归清理 JSON 不支持的 NaN/Infinity，避免下游出现 undefined。"""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, str) and value.strip().lower() in {"undefined", "nan"}:
+        return None
+    if isinstance(value, dict):
+        return {str(k): sanitize_json(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [sanitize_json(v) for v in value]
+    return value
+
+
 def write_output(output, output_path: str | None = None):
     """将 Python 对象写入 JSON 文件或打印到 stdout。
 
@@ -820,14 +967,15 @@ def write_output(output, output_path: str | None = None):
         output: 可被 json.dump 序列化的 Python 对象（通常为 dict）
         output_path: JSON 文件路径，为 None 时输出到 stdout
     """
+    output = sanitize_json(output)
     if output_path:
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(output, f, ensure_ascii=False, indent=2)
+            json.dump(output, f, ensure_ascii=False, indent=2, allow_nan=False)
     else:
         tmp = tempfile.NamedTemporaryFile(
             mode="w", encoding="utf-8", suffix=".json", delete=False
         )
-        json.dump(output, tmp, ensure_ascii=False, indent=2)
+        json.dump(output, tmp, ensure_ascii=False, indent=2, allow_nan=False)
         tmp.close()
         with open(tmp.name, "r", encoding="utf-8") as f:
             sys.stdout = open(

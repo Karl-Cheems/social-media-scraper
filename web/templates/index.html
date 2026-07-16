@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>社交媒体监控平台</title>
+<style>
+/* ── Design Tokens ────────────────────────────── */
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --primary-light: #dbeafe;
+  --primary-50: #eff6ff;
+  --bg: #f1f5f9;
+  --bg-alt: #f8fafc;
+  --surface: #ffffff;
+  --text: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --success: #059669;
+  --success-bg: #d1fae5;
+  --warning: #d97706;
+  --warning-bg: #fef3c7;
+  --danger: #dc2626;
+  --danger-bg: #fee2e2;
+  --info: #6366f1;
+  --info-bg: #e0e7ff;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -2px rgba(0,0,0,.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.04);
+  --transition: .2s cubic-bezier(.4,0,.2,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.6;
+  min-height:100vh;
+}
+
+/* ── Scrollbar ────────────────────────────────── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+
+/* ── Auth Pages ──────────────────────────────── */
+.auth-wrap{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#1e3a5f 0%,#1e40af 50%,#2563eb 100%);
+  padding:20px;
+}
+.auth-card{
+  background:var(--surface);border-radius:16px;padding:36px 32px 28px;
+  width:100%;max-width:400px;box-shadow:0 25px 50px -12px rgba(0,0,0,.25);
+}
+.auth-card h1{font-size:20px;font-weight:700;text-align:center;color:var(--text);margin-bottom:6px}
+.auth-card .sub{text-align:center;color:var(--text-muted);font-size:13px;margin-bottom:24px}
+.auth-tabs{display:flex;background:var(--bg-alt);border-radius:var(--radius-sm);padding:3px;margin-bottom:20px}
+.auth-tabs button{
+  flex:1;padding:8px;border:none;background:none;border-radius:4px;
+  font-size:14px;font-weight:500;cursor:pointer;color:var(--text-secondary);
+  font-family:inherit;transition:var(--transition);
+}
+.auth-tabs button.active{background:var(--surface);color:var(--primary);box-shadow:var(--shadow)}
+.auth-field{margin-bottom:14px}
+.auth-field label{font-size:13px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px}
+.auth-field input{
+  width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);
+  font-size:14px;font-family:inherit;transition:var(--transition);background:#fff;
+}
+.auth-field input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.auth-btn{
+  width:100%;padding:11px;border:none;border-radius:var(--radius-sm);
+  font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;
+  background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+  color:#fff;margin-top:6px;transition:var(--transition);
+}
+.auth-btn:hover{box-shadow:0 4px 12px rgba(37,99,235,.35);transform:translateY(-1px)}
+.auth-error{color:var(--danger);font-size:13px;text-align:center;margin-top:8px;display:none}
+
+/* ── Header ───────────────────────────────────── */
+.header{
+  background:linear-gradient(135deg,#1e3a5f 0%,#1e40af 50%,#2563eb 100%);
+  color:#fff;padding:0 28px;height:58px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+  box-shadow:0 2px 12px rgba(30,64,175,.3);
+}
+.header h1{
+  font-size:17px;font-weight:600;letter-spacing:.3px;
+  display:flex;align-items:center;gap:10px;
+}
+.header h1::before{
+  content:'';display:inline-block;width:8px;height:8px;
+  border-radius:50%;background:#60a5fa;
+  box-shadow:0 0 8px rgba(96,165,250,.6);
+}
+.header-right{font-size:13px;display:flex;align-items:center;gap:12px}
+#sbar{
+  background:rgba(255,255,255,.15);padding:5px 14px;border-radius:20px;
+  font-size:12px;font-weight:500;backdrop-filter:blur(4px);
+  display:flex;align-items:center;gap:6px;
+}
+.header-user{
+  background:rgba(255,255,255,.15);padding:5px 14px;border-radius:20px;
+  font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px;
+}
+.btn-logout{
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);
+  color:#fff;padding:4px 12px;border-radius:14px;font-size:12px;
+  cursor:pointer;font-family:inherit;transition:var(--transition);
+}
+.btn-logout:hover{background:rgba(255,255,255,.2)}
+
+/* ── Tab Bar ──────────────────────────────────── */
+.sticky-bar{
+  display:flex;background:var(--surface);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:58px;z-index:99;
+  overflow-x:auto;padding:0 4px;
+  box-shadow:var(--shadow);
+  -webkit-overflow-scrolling:touch;
+}
+.sticky-bar button{
+  padding:12px 20px;border:none;background:none;
+  font-size:13px;font-weight:500;cursor:pointer;
+  color:var(--text-secondary);white-space:nowrap;font-family:inherit;
+  position:relative;transition:var(--transition);
+  flex-shrink:0;
+}
+.sticky-bar button::after{
+  content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  width:0;height:2.5px;border-radius:2px 2px 0 0;
+  background:var(--primary);transition:var(--transition);
+}
+.sticky-bar button:hover{color:var(--primary);background:var(--primary-50)}
+.sticky-bar button.active{color:var(--primary);font-weight:600}
+.sticky-bar button.active::after{width:60%}
+
+/* ── Content ──────────────────────────────────── */
+.content{max-width:840px;margin:0 auto;padding:20px 16px 40px;display:none}
+.content.show{display:block}
+.tp{display:none}.tp.active{display:block}
+
+/* ── Cards ────────────────────────────────────── */
+.card{
+  background:var(--surface);border-radius:var(--radius);
+  padding:20px 24px;margin-bottom:14px;
+  box-shadow:var(--shadow);border:1px solid var(--border-light);
+  transition:var(--transition);
+}
+.card:hover{box-shadow:var(--shadow-md)}
+.card h2{
+  font-size:15px;font-weight:600;margin-bottom:16px;
+  color:var(--text);display:flex;align-items:center;gap:8px;
+  padding-bottom:12px;border-bottom:1px solid var(--border-light);
+}
+.card h3{
+  font-size:14px;font-weight:600;color:var(--text-secondary);
+  margin-bottom:12px;
+}
+
+/* ── Form Elements ────────────────────────────── */
+label{
+  font-size:13px;font-weight:500;color:var(--text-secondary);
+  display:block;margin-top:12px;margin-bottom:4px;
+}
+label:first-of-type{margin-top:0}
+input:not([type=checkbox]):not([type=radio]),select,textarea{
+  width:100%;padding:8px 12px;
+  border:1.5px solid var(--border);border-radius:var(--radius-sm);
+  font-size:14px;font-family:inherit;color:var(--text);
+  background:#fff;transition:var(--transition);
+}
+input:not([type=checkbox]):not([type=radio]),select{-webkit-appearance:none;appearance:none}
+input[type=checkbox],input[type=radio]{width:auto;padding:0;border:none;background:none;accent-color:var(--primary)}
+input:focus,select:focus,textarea:focus{
+  outline:none;border-color:var(--primary);
+  box-shadow:0 0 0 3px rgba(37,99,235,.12);
+  background:#fff;
+}
+input::placeholder{color:var(--text-muted)}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:32px}
+.row{display:flex;gap:12px}
+.row>div{flex:1;min-width:0}
+
+/* ── Buttons ──────────────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 20px;border:none;border-radius:var(--radius-sm);
+  font-size:13px;font-weight:500;cursor:pointer;
+  font-family:inherit;transition:var(--transition);
+  line-height:1.4;
+}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.btn-primary{
+  background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+  color:#fff;box-shadow:0 1px 3px rgba(37,99,235,.3);
+}
+.btn-primary:hover{box-shadow:0 4px 8px rgba(37,99,235,.35);transform:translateY(-1px)}
+.btn-primary:active{transform:translateY(0)}
+.btn-success{
+  background:var(--success);color:#fff;box-shadow:0 1px 3px rgba(5,150,105,.3);
+}
+.btn-success:hover{box-shadow:0 4px 8px rgba(5,150,105,.35);transform:translateY(-1px)}
+.btn-outline{
+  background:var(--surface);color:var(--text-secondary);
+  border:1.5px solid var(--border);
+}
+.btn-outline:hover{background:var(--bg-alt);border-color:var(--text-muted);color:var(--text)}
+.btn-danger{
+  background:var(--danger);color:#fff;box-shadow:0 1px 3px rgba(220,38,38,.3);
+}
+.btn-danger:hover{box-shadow:0 4px 8px rgba(220,38,38,.35);transform:translateY(-1px)}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-group{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+
+/* ── Empty State ──────────────────────────────── */
+.empty{
+  padding:40px 20px;text-align:center;color:var(--text-muted);
+  font-size:14px;display:flex;flex-direction:column;align-items:center;gap:8px;
+}
+.empty::before{content:'📋';font-size:28px;opacity:.5}
+
+/* ── Task List ────────────────────────────────── */
+.task-item{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 0;border-bottom:1px solid var(--border-light);
+  cursor:pointer;transition:var(--transition);border-radius:4px;
+}
+.task-item:hover{background:var(--primary-50);margin:0 -8px;padding:10px 8px}
+.task-item:last-child{border:none}
+.ti{
+  width:30px;height:30px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;flex-shrink:0;
+}
+.ti.q{background:var(--warning-bg);color:#b45309}
+.ti.r{background:var(--primary-light);color:var(--primary);animation:pulse 1.2s infinite}
+.ti.d{background:var(--success-bg);color:#047857}
+.ti.e{background:var(--danger-bg);color:#b91c1c}
+.tn{font-size:14px;font-weight:500;color:var(--text)}
+.tm{font-size:11px;color:var(--text-muted);margin-top:2px}
+@keyframes pulse{0%,100%{opacity:1}60%{opacity:.5}}
+
+/* ── Log Box ──────────────────────────────────── */
+.log-box{
+  background:#1e293b;color:#e2e8f0;
+  font-family:"Fira Code","Cascadia Code",Consolas,monospace;
+  font-size:12px;padding:14px 16px;border-radius:var(--radius-sm);
+  max-height:320px;overflow-y:auto;white-space:pre-wrap;
+  line-height:1.6;margin-top:10px;
+}
+#tdetail{display:none}
+#tdetail.show{display:block}
+#tdetail.show .card{background:var(--bg-alt);border:1px solid var(--border)}
+
+/* ── Keywords Grid ────────────────────────────── */
+.kwg{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));
+  gap:6px;max-height:180px;overflow-y:auto;
+  margin:10px 0;padding:4px 2px;
+}
+.kwg label{
+  display:flex;align-items:center;gap:6px;
+  font-size:13px;cursor:pointer;padding:6px 10px;
+  border-radius:var(--radius-sm);margin:0;
+  border:1px solid var(--border-light);
+  background:var(--bg-alt);transition:var(--transition);
+}
+.kwg label:hover{background:var(--primary-50);border-color:var(--primary-light)}
+.kwg input[type=checkbox]{width:auto;margin:0}
+.kwg .kw-item{display:flex;align-items:center;gap:4px;padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border-light);background:var(--bg-alt);transition:var(--transition)}
+.kwg .kw-item:hover{background:var(--primary-50);border-color:var(--primary-light)}
+.kwg .kw-item label{flex:1;min-width:0;padding:0;border:0;background:transparent;overflow-wrap:anywhere}
+.kwg .kw-item label:hover{background:transparent;border-color:transparent}
+.kw-delete{border:0;background:transparent;color:var(--danger);font-size:12px;cursor:pointer;padding:4px 6px;border-radius:4px;flex-shrink:0}
+.kw-delete:hover{background:var(--danger-bg)}
+.keyword-add-row{display:flex;align-items:center;gap:8px}
+.keyword-add-row input{flex:1;min-width:0}
+
+/* ── Competitors Grid ─────────────────────────── */
+.cpg{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow-y:auto;margin:10px 0;padding:2px 0}
+.cpg label{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 12px;font-size:13px;cursor:pointer;
+  border-radius:var(--radius-sm);margin:0;
+  border:1px solid var(--border-light);
+  background:var(--bg-alt);transition:var(--transition);
+}
+.cpg label:hover{background:var(--primary-50);border-color:var(--primary-light)}
+.cpg .cp-icon{font-size:15px;flex-shrink:0}
+.cpg .cp-brand{font-weight:500;color:var(--text)}
+.cpg .cp-platform{color:var(--text-muted);font-size:12px;margin-left:8px}
+
+/* ── Table ────────────────────────────────────── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:10px 8px;border-bottom:1px solid var(--border-light);text-align:left;vertical-align:middle}
+th{color:var(--text-muted);font-weight:600;font-size:12px;letter-spacing:.3px}
+tr:nth-child(even) td{background:var(--bg-alt)}
+tr:hover td{background:var(--primary-50)}
+
+/* ── Badges ───────────────────────────────────── */
+.bdg{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;
+}
+.bdg.g{background:var(--success-bg);color:#065f46}
+.bdg.y{background:var(--warning-bg);color:#92400e}
+.bdg.gr{background:#f1f5f9;color:var(--text-secondary)}
+.bdg.r{background:var(--danger-bg);color:#991b1b}
+
+/* ── Toast ────────────────────────────────────── */
+.toast{
+  position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-20px);
+  background:#1e293b;color:#f8fafc;
+  padding:10px 24px;border-radius:var(--radius-sm);
+  font-size:14px;z-index:9999;
+  opacity:0;
+  transition:all .3s cubic-bezier(.4,0,.2,1);
+  pointer-events:none;box-shadow:var(--shadow-lg);
+  max-width:400px;text-align:center;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#991b1b}
+
+/* ── QR Modal ─────────────────────────────────── */
+.qr-overlay{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  background:rgba(15,23,42,.6);
+  z-index:9999;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);
+  animation:fadeIn .2s ease;
+}
+.qr-modal{
+  background:var(--surface);border-radius:16px;padding:32px;
+  text-align:center;max-width:400px;width:90%;
+  box-shadow:0 25px 50px -12px rgba(0,0,0,.25);
+  animation:scaleIn .25s ease;
+}
+.qr-modal h3{font-size:16px;font-weight:600;margin-bottom:16px;color:var(--text)}
+.qr-modal img{width:360px;height:360px;max-width:80vw;max-height:60vh;object-fit:contain;image-rendering:pixelated;border-radius:12px;margin:8px 0;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.qr-modal p{color:var(--text-muted);font-size:13px;margin-top:12px}
+.qr-modal .btn{margin-top:16px}
+
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+
+/* ── Section Divider ──────────────────────────── */
+.section-divider{
+  text-align:center;position:relative;margin:12px 0;
+  color:var(--text-muted);font-size:12px;font-weight:500;
+}
+.section-divider::before,.section-divider::after{
+  content:'';position:absolute;top:50%;width:30%;
+  height:1px;background:var(--border);
+}
+.section-divider::before{left:0}
+.section-divider::after{right:0}
+
+/* ── Login Success Animation ──────────────────── */
+.login-success{
+  display:flex;flex-direction:column;align-items:center;gap:12px;
+  padding:20px;
+}
+.login-success .check{width:56px;height:56px;border-radius:50%;background:var(--success-bg);display:flex;align-items:center;justify-content:center;animation:scaleIn .3s ease}
+.login-success .check svg{width:28px;height:28px;color:var(--success)}
+.login-success span{font-size:18px;font-weight:600;color:#047857}
+
+/* ── Password Input with Toggle ───────────────── */
+.pwd-wrap{position:relative}
+.pwd-wrap input{padding-right:36px}
+.pwd-toggle{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;font-size:16px;
+  color:var(--text-muted);padding:4px;line-height:1;
+}
+
+/* ── Instance Config ──────────────────────────── */
+.cfg-section{margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border-light)}
+.cfg-section:last-child{border:none;margin-bottom:0;padding-bottom:0}
+.cfg-section h3{font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.cfg-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:13px}
+.cfg-info-grid .lbl{color:var(--text-muted)}
+.cfg-info-grid .val{color:var(--text);font-weight:500}
+.acct-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px;background:var(--bg-alt);border-radius:var(--radius-sm);
+  margin-bottom:6px;
+}
+.acct-row .acct-info{display:flex;align-items:center;gap:10px}
+.acct-row .acct-actions{display:flex;gap:4px}
+
+/* ── Parameter Forms & Scheduler ───────────────── */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.field{min-width:0}
+.field>label{margin-bottom:6px}
+.field-hint{font-size:12px;color:var(--text-muted);margin-top:5px;line-height:1.5}
+.param-section{margin:14px 0;padding:14px;border:1px solid var(--border-light);border-radius:var(--radius-sm);background:var(--bg-alt)}
+.param-section-title{font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:10px}
+.check-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:12px 0}
+.check-row label,.weekday-picker label{display:inline-flex;align-items:center;gap:7px;margin:0;cursor:pointer;font-size:13px;color:var(--text-secondary)}
+.check-row input,.weekday-picker input{margin:0}
+.action-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px}
+.account-summary{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+.account-summary>div{padding:9px 12px;border:1px solid var(--border-light);border-radius:var(--radius-sm);background:var(--bg-alt);font-size:13px}
+.schedule-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}
+.schedule-head p{font-size:13px;color:var(--text-muted);line-height:1.5}
+.schedule-list{display:flex;flex-direction:column;gap:8px}
+.schedule-item{display:grid;grid-template-columns:auto minmax(180px,1fr) auto;align-items:center;gap:12px;padding:13px 14px;border:1px solid var(--border-light);border-radius:var(--radius-sm);background:var(--surface)}
+.schedule-item.disabled{opacity:.62;background:var(--bg-alt)}
+.schedule-name{font-size:14px;font-weight:600;color:var(--text)}
+.schedule-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;font-size:12px;color:var(--text-muted)}
+.schedule-params{margin-top:5px;font-size:12px;color:var(--text-secondary);white-space:normal;overflow-wrap:anywhere}
+.schedule-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.schedule-modal{text-align:left;max-width:560px}
+.schedule-modal h3{text-align:left;margin-bottom:18px}
+.weekday-picker{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:6px}
+.weekday-picker label{justify-content:center;padding:8px 4px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-alt)}
+.status-never{color:var(--text-muted)}
+.status-completed{color:var(--success)}
+.status-error{color:var(--danger)}
+.status-running,.status-queued{color:var(--warning)}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
+
+/* ── Responsive ───────────────────────────────── */
+@media(max-width:640px){
+  .header{padding:0 16px;height:52px}
+  .header h1{font-size:15px}
+  .sticky-bar{top:52px}
+  .sticky-bar button{padding:10px 14px;font-size:12px}
+  .content{padding:12px}
+  .card{padding:16px}
+  .row{flex-direction:column;gap:8px}
+  .btn{padding:8px 16px}
+  .toast{left:16px;right:16px;transform:translateY(-20px);max-width:none}
+  .toast.show{transform:translateY(0)}
+  .qr-modal{padding:24px 20px}
+  table{font-size:12px}
+  td,th{padding:8px 6px}
+  .cfg-info-grid{grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}
+  .schedule-item{grid-template-columns:auto 1fr}
+  .schedule-actions{grid-column:1 / -1;justify-content:flex-start}
+  .weekday-picker{grid-template-columns:repeat(4,1fr)}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Auth Page ── -->
+<div id="authPage" class="auth-wrap">
+  <div class="auth-card">
+    <h1>📊 社交媒体监控</h1>
+    <p class="sub">请登录您的实例以继续</p>
+
+    <div class="auth-tabs">
+      <button id="tabLogin" class="active" onclick="switchAuth('login')">🔑 登录</button>
+      <button id="tabRegister" onclick="switchAuth('register')">✨ 注册</button>
+    </div>
+
+    <!-- 登录模式 -->
+    <div id="authLogin">
+      <div class="auth-field"><label>实例名称</label><input id="loginName" placeholder="如 worker1" autocomplete="username"></div>
+      <div class="auth-field"><label>实例密码</label><input id="loginPwd" type="password" placeholder="输入密码" autocomplete="current-password"></div>
+      <button class="auth-btn" onclick="doLogin()">🔑 登录</button>
+      <div id="loginError" class="auth-error"></div>
+    </div>
+
+    <!-- 注册模式 -->
+    <div id="authRegister" style="display:none">
+      <div class="auth-field"><label>实例名称</label><input id="regName" placeholder="如 worker1" autocomplete="username"></div>
+      <div class="auth-field"><label>实例密码（至少4位）</label><input id="regPwd" type="password" placeholder="设置密码" autocomplete="new-password"></div>
+      <div class="auth-field"><label>确认密码</label><input id="regPwd2" type="password" placeholder="再次输入密码" autocomplete="new-password"></div>
+      <div class="section-divider">Agent 配置</div>
+      <div class="auth-field"><label>RPC 地址</label><input id="regRpc" placeholder="http://101.42.14.156:8443/paopao/rpc"></div>
+      <div class="auth-field"><label>Sender ID</label><input id="regSender" placeholder="ou_xxx"></div>
+      <button class="auth-btn" onclick="doRegister()">✨ 注册并登录</button>
+      <div id="regError" class="auth-error"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main App ── -->
+<div id="appPage" style="display:none">
+
+<div class="header">
+  <h1>社交媒体监控平台</h1>
+  <div class="header-right">
+    <span id="hname" class="header-user"></span>
+    <span id="sbar">🟢 就绪</span>
+    <button class="btn-logout" onclick="doLogout()">退出</button>
+  </div>
+</div>
+
+<div class="sticky-bar" id="tabbar"></div>
+
+<div class="content show" id="main">
+
+  <!-- Tab Panels -->
+  <div class="tp active" id="p_hot"></div>
+  <div class="tp" id="p_keyword"></div>
+  <div class="tp" id="p_self"></div>
+  <div class="tp" id="p_comp"></div>
+  <div class="tp" id="p_detail"></div>
+  <div class="tp" id="p_schedule"></div>
+  <div class="tp" id="p_cfg"></div>
+
+  <!-- Task History -->
+  <div class="card"><h2>📋 任务记录</h2><div id="tasklist"><div class="empty">暂无任务</div></div></div>
+  <div class="card" id="tdetail"><h2 id="tdtitle">任务详情</h2><div id="tdactions" class="btn-group" style="margin-bottom:12px"></div><div class="log-box" id="tdlog"></div></div>
+
+</div>
+
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+let config = null
+let instance = null
+let pollTimer = null
+let pollBusy = false
+
+const TIDS = ['hot','keyword','self','comp','detail','schedule','cfg']
+const TNAMES = ['🔥 热搜','🔍 关键词','🏠 自有账号','🏢 竞品账号','📝 内容详情','⏰ 定时任务','⚙️ 实例配置']
+
+// ════════════════════════════════════════════
+// Auth
+// ════════════════════════════════════════════
+
+function switchAuth(mode){
+  document.getElementById('tabLogin').className = mode === 'login' ? 'active' : ''
+  document.getElementById('tabRegister').className = mode === 'register' ? 'active' : ''
+  document.getElementById('authLogin').style.display = mode === 'login' ? '' : 'none'
+  document.getElementById('authRegister').style.display = mode === 'register' ? '' : 'none'
+  document.getElementById('loginError').style.display = 'none'
+  document.getElementById('regError').style.display = 'none'
+}
+
+async function doLogin(){
+  const name = document.getElementById('loginName').value.trim()
+  const pwd = document.getElementById('loginPwd').value
+  if(!name || !pwd){ showAuthError('login', '请填写完整'); return }
+  try{
+    const r = await fetch('/api/auth/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, password:pwd})})
+    const d = await r.json()
+    if(d.ok){ onAuthSuccess(d.instance) }
+    else { showAuthError('login', d.error||'登录失败') }
+  }catch(e){ showAuthError('login', e.message) }
+}
+
+async function doRegister(){
+  const name = document.getElementById('regName').value.trim()
+  const pwd = document.getElementById('regPwd').value
+  const pwd2 = document.getElementById('regPwd2').value
+  const rpc = document.getElementById('regRpc').value.trim()
+  const sender = document.getElementById('regSender').value.trim()
+  if(!name || !pwd){ showAuthError('reg', '请填写完整'); return }
+  if(pwd !== pwd2){ showAuthError('reg', '两次密码不一致'); return }
+  if(pwd.length < 4){ showAuthError('reg', '密码至少4位'); return }
+  if(!rpc || !sender){ showAuthError('reg', '请填写 RPC 地址和 Sender ID'); return }
+  try{
+    const r = await fetch('/api/auth/register', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, password:pwd, rpc_url:rpc, sender_id:sender})})
+    const d = await r.json()
+    if(d.ok){ onAuthSuccess(d.instance) }
+    else { showAuthError('reg', d.error||'注册失败') }
+  }catch(e){ showAuthError('reg', e.message) }
+}
+
+function showAuthError(mode, msg){
+  const el = document.getElementById(mode === 'login' ? 'loginError' : 'regError')
+  el.textContent = msg; el.style.display = 'block'
+}
+
+async function onAuthSuccess(inst){
+  instance = inst
+  document.getElementById('authPage').style.display = 'none'
+  document.getElementById('appPage').style.display = ''
+  document.getElementById('hname').textContent = '🖥️ ' + (inst.name || inst.id)
+  await loadConfig()
+  renderTabs()
+  poll()
+}
+
+async function doLogout(){
+  await fetch('/api/auth/logout', {method:'POST'})
+  instance = null
+  if(pollTimer){ clearTimeout(pollTimer); pollTimer=null }
+  document.getElementById('appPage').style.display = 'none'
+  document.getElementById('authPage').style.display = ''
+  document.getElementById('loginPwd').value = ''
+  document.getElementById('loginError').style.display = 'none'
+}
+
+// ════════════════════════════════════════════
+// Init
+// ════════════════════════════════════════════
+
+async function init(){
+  try{
+    const r = await fetch('/api/auth/check')
+    const d = await r.json()
+    if(d.ok && d.instance){
+      instance = d.instance
+      document.getElementById('authPage').style.display = 'none'
+      document.getElementById('appPage').style.display = ''
+      document.getElementById('hname').textContent = '🖥️ ' + (d.instance.name || d.instance.id)
+      await loadConfig()
+      renderTabs()
+      poll()
+    }
+  }catch(e){}
+}
+
+async function loadConfig(){
+  try{
+    const r = await fetch('/api/config')
+    config = await r.json()
+  }catch(e){}
+}
+
+function renderTabs(){
+  const bar = document.getElementById('tabbar')
+  bar.innerHTML = TNAMES.map((n,i) => `<button data-i="${i}" onclick="go(${i})">${n}</button>`).join('')
+  go(0)
+}
+
+function go(i){
+  document.querySelectorAll('.sticky-bar button').forEach(b => b.classList.toggle('active', +b.dataset.i === i))
+  document.querySelectorAll('.tp').forEach(p => p.classList.remove('active'))
+  const p = document.getElementById('p_'+TIDS[i])
+  if(!p) return
+  p.classList.add('active')
+  if(!p.done){
+    p.done = 1
+    const f = [renderHot, renderKw, renderSelf, renderComp, renderDetail, renderSchedule, renderCfg]
+    if(f[i]) f[i](p)
+  }
+}
+
+function esc(s){
+  if(s==null || s===undefined) return ''
+  const value=String(s)
+  if(['undefined','nan','null'].includes(value.trim().toLowerCase())) return ''
+  const div=document.createElement('div')
+  div.appendChild(document.createTextNode(value))
+  return div.innerHTML
+}
+
+function msg(t, e){
+  const el = document.getElementById('toast')
+  el.textContent = t
+  el.className = 'toast' + (e ? ' err' : '')
+  el.classList.add('show')
+  setTimeout(() => el.classList.remove('show'), 2500)
+}
+
+const seenRiskTasks = new Set()
+function showRiskAlert(platform, reason){
+  const names={xiaohongshu:'小红书',weibo:'微博',douyin:'抖音'}
+  const old=document.getElementById('riskAlert'); if(old) old.remove()
+  const div=document.createElement('div'); div.id='riskAlert'; div.className='qr-overlay'
+  div.setAttribute('role','alertdialog'); div.setAttribute('aria-modal','true'); div.setAttribute('aria-labelledby','riskAlertTitle')
+  const text=reason||((names[platform]||'平台')+'触发了安全验证，请在 Edge 中完成验证后再继续。')
+  div.innerHTML='<div class="qr-modal"><h3 id="riskAlertTitle">⚠️ 需要人工处理</h3><p style="font-size:15px;color:var(--text);line-height:1.7">'+esc(text)+'</p><p>采集任务已暂停，系统不会继续自动操作该账号。</p><div class="action-row" style="justify-content:center"><button class="btn btn-primary" onclick="this.closest(\'.qr-overlay\').remove();go(TIDS.indexOf(\'cfg\'))">前往实例配置</button><button class="btn btn-outline" onclick="this.closest(\'.qr-overlay\').remove()">稍后处理</button></div></div>'
+  document.body.appendChild(div)
+}
+
+async function sub(type, params, label){
+  document.getElementById('sbar').textContent = '🟡 提交中...'
+  try{
+    const r = await fetch('/api/tasks', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,params,label})})
+    const d = await r.json()
+    if(d.error){
+      if(d.risk_detected){
+        showRiskAlert(d.risk_platform,d.risk_reason||d.error)
+        go(TIDS.indexOf('cfg'))
+      } else if(d.need_login){
+        msg('❌ 需要 '+({xiaohongshu:'📕小红书',weibo:'📱微博',douyin:'🎵抖音'}[d.need_login]||d.need_login)+' 登录态，请先在实例配置中扫码登录', 1)
+        go(TIDS.indexOf('cfg'))
+      } else {
+        msg(d.error||'提交失败',1)
+      }
+      return
+    }
+    msg('✅ 已提交')
+    poll()
+  }catch(e){ msg('❌ '+e.message,1) }
+  finally{ document.getElementById('sbar').textContent = '🟢 就绪' }
+}
+
+async function poll(){
+  if(!instance || pollBusy) return
+  if(pollTimer){ clearTimeout(pollTimer); pollTimer=null }
+  pollBusy=true
+  try{
+    const r = await fetch('/api/tasks')
+    const data = await r.json()
+    const list = Array.isArray(data) ? data : []
+    list.filter(t=>t&&t.risk_detected&&!seenRiskTasks.has(t.id)).forEach(t=>{
+      seenRiskTasks.add(t.id)
+      showRiskAlert(t.risk_platform,t.risk_reason||t.error)
+    })
+    const el = document.getElementById('tasklist')
+    const ic = {queued:'⏳',running:'🔄',completed:'✅',error:'❌'}
+    const cc = {queued:'q',running:'r',completed:'d',error:'e'}
+    el.innerHTML = list.length
+      ? list.map(t => '<div class="task-item" onclick="vt('+((t&&t.id)||0)+')"><div class="ti '+(cc[t.status]||'q')+'">'+(ic[t.status]||'⏳')+'</div><div><div class="tn">'+esc(t.label||t.type)+'</div><div class="tm">'+(t.created_at||'')+'</div></div></div>').join('')
+      : '<div class="empty">暂无任务</div>'
+  }catch(e){}
+  finally{
+    pollBusy=false
+    if(instance) pollTimer=setTimeout(poll,2000)
+  }
+}
+async function vt(id){
+  try{
+    const r = await fetch('/api/tasks/'+id)
+    const t = await r.json()
+    if(!r.ok) throw new Error(t.error||'任务读取失败')
+    const el = document.getElementById('tdetail')
+    el.classList.add('show')
+    const statusName = {queued:'排队中',running:'执行中',completed:'已完成',error:'失败'}[t.status]||'未知状态'
+    document.getElementById('tdtitle').textContent = (t.label||'任务')+' ('+statusName+')'
+    const logs = (t.logs||[]).map(l => String(l==null?'':l))
+    if(t.error) logs.push('错误：'+t.error)
+    const lg = document.getElementById('tdlog')
+    lg.textContent = logs.join('\n')
+    document.getElementById('tdactions').innerHTML = t.has_result
+      ? '<a class="btn btn-primary btn-sm" href="/api/tasks/'+id+'/download">⬇ 下载 JSON 结果</a>'
+      : '<span style="color:var(--text-muted);font-size:13px">任务完成并生成结果后可下载</span>'
+    setTimeout(() => lg.scrollTop = lg.scrollHeight, 30)
+  }catch(e){ msg('❌ '+(e.message||'任务读取失败'),1) }
+}
+// ════════════════════════════════════════════
+// Tab 内容
+// ════════════════════════════════════════════
+
+// 通用表单工具
+function fieldInt(id, label, min, max){
+  const el = document.getElementById(id)
+  const value = Number(el && el.value)
+  if(!Number.isInteger(value) || value < min || value > max) throw new Error(label+'必须在 '+min+' 到 '+max+' 之间')
+  return value
+}
+function isChecked(id){ const el=document.getElementById(id); return !!(el&&el.checked) }
+function scheduleButton(type){ return '<button class="btn btn-outline" onclick="openSchedule(\''+type+'\')">⏰ 设置定时任务</button>' }
+
+// 热搜
+function renderHot(p){
+  p.innerHTML = `<div class="card"><h2>🔥 热搜采集</h2>
+    <div class="form-grid">
+      <div class="field"><label for="hp">采集平台</label><select id="hp"><option value="weibo_hot">微博热搜</option><option value="weibo_ent">微博文娱</option><option value="douyin">抖音热榜</option><option value="merged" selected>合并模式</option></select></div>
+      <div class="field"><label for="hn">采集数量</label><input type="number" id="hn" value="15" min="1" max="50"><div class="field-hint">每个平台最多采集 50 条</div></div>
+    </div>
+    <div class="check-row"><label><input type="checkbox" id="ha" checked> 发送到 AI Agent</label></div>
+    <div class="action-row"><button class="btn btn-primary" onclick="runFormTask('hot',this)">▶ 开始采集</button>${scheduleButton('hot')}</div>
+  </div>`
+}
+
+// 关键词搜索
+function renderKw(p){
+  const lines = (config&&config.product_lines||[]).map(x => '<option value="'+encodeURIComponent(String((x&&x.name)||''))+'">'+esc((x&&x.name)||'')+'</option>').join('')
+  p.innerHTML = `<div class="card"><h2>🔍 关键词搜索</h2>
+    <div class="form-grid"><div class="field"><label for="kl">产品线</label><select id="kl" onchange="kwCh()">${lines}</select></div>
+      <div class="field"><label>&nbsp;</label><button class="btn btn-outline btn-sm" onclick="kwTog()">☑ 全选/取消</button></div></div>
+    <div class="kwg" id="kwg"></div>
+    <div class="field"><label for="kc">新增关键词（逗号或空格分隔）</label><div class="keyword-add-row"><input type="text" id="kc" placeholder="新品上市, 联名款" onkeydown="if(event.key===\'Enter\'){event.preventDefault();saveCustomKeywords(this.nextElementSibling)}"><button class="btn btn-outline" onclick="saveCustomKeywords(this)">保存到产品线</button></div><div class="field-hint">保存后会写入配置，下次打开仍然保留；列表中的所有关键词都可以删除。</div></div>
+    <div class="param-section"><div class="param-section-title">搜索平台</div>
+      <div class="check-row"><label><input type="checkbox" id="kwWeibo" checked onchange="kwPlatformChanged()"> 微博</label><label><input type="checkbox" id="kwXhs" checked onchange="kwPlatformChanged()"> 小红书</label></div>
+    </div>
+    <div class="param-section" id="kwXhsParams"><div class="param-section-title">小红书参数</div>
+      <div class="form-grid">
+        <div class="field"><label for="kwPer">每个关键词采集条数</label><input type="number" id="kwPer" value="5" min="1" max="20"></div>
+        <div class="field"><label for="kwComments">每条内容评论数</label><input type="number" id="kwComments" value="200" min="0" max="999"></div>
+        <div class="field"><label for="kwSort">排序方式</label><select id="kwSort"><option value="likes">最多点赞</option><option value="comments">最多评论</option></select></div>
+        <div class="field"><label for="kwContent">内容类型</label><select id="kwContent"><option value="all">不限</option><option value="image_text">仅图文</option></select></div>
+        <div class="field"><label for="kwPacing">小红书访问节奏</label><select id="kwPacing"><option value="fast">快速（风险高）</option><option value="balanced" selected>均衡</option><option value="conservative">保守（速度慢）</option></select></div>
+      </div>
+      <div class="field-hint">快速模式停顿最少、封控风险较高；均衡模式接近人工浏览节奏；保守模式停顿更多、速度较慢。三种模式发现验证或访问频繁时都会立即停止。</div>
+    </div>
+    <div class="check-row"><label><input type="checkbox" id="kwa" checked> 发送到 AI Agent</label></div>
+    <div class="action-row"><button class="btn btn-primary" onclick="runFormTask('keyword',this)">▶ 开始搜索</button>${scheduleButton('keyword')}</div>
+  </div>`
+  kwCh(); kwPlatformChanged()
+}
+function currentProductLine(){
+  const select=document.getElementById('kl')
+  return select?decodeURIComponent(select.value||''):''
+}
+function kwCh(){
+  const name=currentProductLine()
+  const line=(config&&config.product_lines||[]).find(x=>x.name===name)
+  const grid=document.getElementById('kwg')
+  if(!grid) return
+  const keywords=line?[...new Set([...(line.keywords||[]),...(line.custom||[])])]:[]
+  grid.innerHTML=keywords.length?keywords.map(x=>{
+    const encoded=encodeURIComponent(String(x))
+    return '<div class="kw-item"><label><input type="checkbox" class="kwc" data-value="'+encoded+'" checked> <span>'+esc(x)+'</span></label><button type="button" class="kw-delete" aria-label="删除关键词 '+esc(x)+'" onclick="deleteKeyword(event,\''+encoded+'\')">删除</button></div>'
+  }).join(''):'<span class="field-hint">暂无关键词，可在下方添加。</span>'
+}
+async function saveCustomKeywords(button){
+  const input=document.getElementById('kc')
+  const keywords=(input.value||'').trim().split(/[,，\s]+/).filter(Boolean)
+  if(!keywords.length){msg('请输入要保存的关键词',1);return}
+  const original=button.textContent;button.disabled=true;button.textContent='保存中…'
+  try{
+    const r=await fetch('/api/config/keywords',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_line:currentProductLine(),keywords})})
+    const d=await r.json();if(!r.ok)throw new Error(d.error||'保存失败')
+    config.product_lines=d.product_lines||[];input.value='';kwCh()
+    msg(d.added&&d.added.length?'✅ 关键词已保存':'这些关键词已经存在')
+  }catch(e){msg(e.message||'保存失败',1)}
+  finally{button.disabled=false;button.textContent=original}
+}
+async function deleteKeyword(event,encoded){
+  event.preventDefault();event.stopPropagation()
+  const keyword=decodeURIComponent(encoded)
+  if(!confirm('确定从当前产品线删除关键词“'+keyword+'”吗？'))return
+  try{
+    const r=await fetch('/api/config/keywords',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_line:currentProductLine(),keyword})})
+    const d=await r.json();if(!r.ok)throw new Error(d.error||'删除失败')
+    config.product_lines=d.product_lines||[];kwCh();msg('已删除关键词')
+  }catch(e){msg(e.message||'删除失败',1)}
+}function kwTog(){
+  const items = document.querySelectorAll('.kwc')
+  if(!items.length) return
+  const allChecked = Array.from(items).every(x => x.checked)
+  items.forEach(x => x.checked = !allChecked)
+}
+function kwPlatformChanged(){
+  const box=document.getElementById('kwXhsParams')
+  if(box) box.style.opacity=isChecked('kwXhs')?'1':'.55'
+}
+
+// 自有账号
+function renderSelf(p){
+  const items = (config&&config.competitors||[]).filter(x => x&&x.brand==='元气森林')
+  p.innerHTML = `<div class="card"><h2>🏠 自有账号</h2>
+    <div class="field-hint">固定采集配置文件中的元气森林微博和小红书账号。</div>
+    <div class="account-summary">${items.map(x => '<div>'+((x&&x.platform)==='weibo'?'📱':'📕')+' '+esc(x&&x.brand)+' · '+esc((x&&x.platform)==='weibo'?'微博':'小红书')+'</div>').join('')||'<div>未找到自有账号配置</div>'}</div>
+    ${accountParamsHtml('self', 300)}
+    <div class="action-row"><button class="btn btn-primary" onclick="runFormTask('self',this)">▶ 开始采集</button>${scheduleButton('self')}</div>
+  </div>`
+}
+
+// 竞品账号
+function renderComp(p){
+  const items = (config&&config.competitors||[]).filter(x => x&&x.brand!=='元气森林')
+  p.innerHTML = `<div class="card"><h2>🏢 竞品账号</h2>
+    <div class="schedule-head"><div><label style="margin:0">选择需要采集的竞品账号</label><div class="field-hint">共 ${items.length} 个账号，可分别选择微博或小红书账号。</div></div><button class="btn btn-outline btn-sm" onclick="cpTog()">☑ 全选/取消</button></div>
+    <div class="cpg">${items.map(x => '<label><input type="checkbox" class="cpc" data-value="'+encodeURIComponent(String((x&&x.identifier)||''))+'" checked> <span class="cp-icon">'+((x&&x.platform)==='weibo'?'📱':'📕')+'</span><span class="cp-brand">'+esc(x&&x.brand)+'</span><span class="cp-platform">'+((x&&x.platform)==='weibo'?'微博':'小红书')+'</span></label>').join('')}</div>
+    ${accountParamsHtml('comp', 200)}
+    <div class="action-row"><button class="btn btn-primary" onclick="runFormTask('comp',this)">▶ 开始采集</button>${scheduleButton('comp')}</div>
+  </div>`
+}
+function accountParamsHtml(prefix, comments){
+  return `<div class="param-section"><div class="param-section-title">采集参数</div><div class="form-grid">
+    <div class="field"><label for="${prefix}Limit">每个账号采集数量</label><input type="number" id="${prefix}Limit" value="10" min="1" max="50"></div>
+    <div class="field"><label for="${prefix}Comments">每条内容评论数</label><input type="number" id="${prefix}Comments" value="${comments}" min="0" max="999"></div>
+  </div><div class="check-row"><label><input type="checkbox" id="${prefix}Content" checked> 获取正文</label><label><input type="checkbox" id="${prefix}GetComments" checked> 获取评论</label><label><input type="checkbox" id="${prefix}Agent" checked> 发送到 AI Agent</label></div></div>`
+}
+function cpTog(){
+  const items=document.querySelectorAll('.cpc')
+  if(!items.length) return
+  const allChecked=Array.from(items).every(x=>x.checked)
+  items.forEach(x=>x.checked=!allChecked)
+}
+
+// 内容详情
+function renderDetail(p){
+  p.innerHTML = `<div class="card"><h2>📝 内容详情采集</h2>
+    <div class="field"><label for="du">内容 URL</label><input type="url" id="du" placeholder="https://weibo.com/xxx 或 https://xiaohongshu.com/xxx"><div class="field-hint">支持微博和小红书内容链接。</div></div>
+    <div class="form-grid" style="margin-top:12px"><div class="field"><label for="dc">评论数量</label><input type="number" id="dc" value="999" min="1" max="999"></div></div>
+    <div class="check-row"><label><input type="checkbox" id="da" checked> 发送到 AI Agent 总结</label></div>
+    <div class="action-row"><button class="btn btn-primary" onclick="runFormTask('detail',this)">▶ 采集并总结</button></div>
+  </div>`
+}
+
+function collectFormTask(formType, showError=true){
+  try{
+    if(formType==='hot'){
+      const platform=document.getElementById('hp').value
+      const names={weibo_hot:'微博热搜',weibo_ent:'微博文娱',douyin:'抖音热榜',merged:'热搜合并'}
+      return {type:'hot',label:names[platform],params:{platform,limit:fieldInt('hn','采集数量',1,50),send_agent:isChecked('ha')}}
+    }
+    if(formType==='keyword'){
+      const preset=Array.from(document.querySelectorAll('.kwc:checked')).map(x=>decodeURIComponent(x.dataset.value||''))
+      const custom=(document.getElementById('kc').value||'').trim().split(/[,，\s]+/).filter(Boolean)
+      const keywords=[...new Set([...preset,...custom])]
+      if(!keywords.length) throw new Error('请至少选择或输入一个关键词')
+      const platforms=[]
+      if(isChecked('kwWeibo')) platforms.push('weibo')
+      if(isChecked('kwXhs')) platforms.push('xiaohongshu')
+      if(!platforms.length) throw new Error('请至少选择一个搜索平台')
+      return {type:'keyword',label:'关键词 '+keywords.length+' 个',params:{keywords,platforms,per_keyword:fieldInt('kwPer','每关键词条数',1,20),max_comments:fieldInt('kwComments','评论数',0,999),sort_by:document.getElementById('kwSort').value,content_type:document.getElementById('kwContent').value,xhs_pacing:document.getElementById('kwPacing').value,send_agent:isChecked('kwa')}}
+    }
+    if(formType==='self'){
+      return {type:'account_self',label:'自有账号监控',params:{limit:fieldInt('selfLimit','采集数量',1,50),max_comments:fieldInt('selfComments','评论数',0,999),include_content:isChecked('selfContent'),include_comments:isChecked('selfGetComments'),send_agent:isChecked('selfAgent')}}
+    }
+    if(formType==='comp'){
+      const urls=Array.from(document.querySelectorAll('.cpc:checked')).map(x=>decodeURIComponent(x.dataset.value||''))
+      if(!urls.length) throw new Error('请至少选择一个竞品账号')
+      return {type:'account_comp',label:'竞品账号监控 '+urls.length+' 个',params:{urls,limit:fieldInt('compLimit','采集数量',1,50),max_comments:fieldInt('compComments','评论数',0,999),include_content:isChecked('compContent'),include_comments:isChecked('compGetComments'),send_agent:isChecked('compAgent')}}
+    }
+    if(formType==='detail'){
+      const url=(document.getElementById('du').value||'').trim()
+      if(!url || !/(weibo\.com|xiaohongshu\.com|xhslink\.com)/i.test(url)) throw new Error('请提供微博或小红书的内容链接')
+      return {type:'detail',label:'定向内容分析',params:{url,max_comments:fieldInt('dc','评论数量',1,999),send_agent:isChecked('da')}}
+    }
+    throw new Error('不支持的功能')
+  }catch(e){ if(showError) msg(e.message||'参数不正确',1); return null }
+}
+async function runFormTask(formType,button){
+  const task=collectFormTask(formType); if(!task) return
+  const original=button?button.textContent:''
+  if(button){button.disabled=true;button.textContent='提交中…'}
+  try{await sub(task.type,task.params,task.label)}
+  finally{if(button){button.disabled=false;button.textContent=original}}
+}
+
+// 定时任务
+const scheduleActionNames={hot:'热搜',keyword:'关键词搜索',account_self:'自有账号',account_comp:'竞品账号'}
+function renderSchedule(p){
+  p.innerHTML = `<div class="card"><div class="schedule-head"><div><h2>⏰ 定时任务</h2><p>调度器随 Web 服务自动运行；即使关闭这个页面，启用的规则仍会按时提交。</p></div><button class="btn btn-outline btn-sm" onclick="loadSchedules()">↻ 刷新</button></div><div id="scheduleList" class="schedule-list"><div class="empty">正在加载规则</div></div></div>`
+  loadSchedules()
+}
+function weekdayText(days){ const names=['一','二','三','四','五','六','日']; return (days||[]).map(x=>'周'+names[x]).join('、') }
+function scheduleParamsText(rule){
+  const p=rule.params||{}
+  if(rule.task_type==='hot') return ({weibo_hot:'微博热搜',weibo_ent:'微博文娱',douyin:'抖音热榜',merged:'合并模式'}[p.platform]||p.platform)+' · '+p.limit+' 条'
+  if(rule.task_type==='keyword') return (p.platforms||[]).map(x=>x==='weibo'?'微博':'小红书').join('+')+' · '+(p.keywords||[]).slice(0,4).join('、')+((p.keywords||[]).length>4?'…':'')+' · 每词 '+p.per_keyword+' 条'
+  if(rule.task_type==='account_self'||rule.task_type==='account_comp') return (p.urls||[]).length+' 个账号 · 每账号 '+p.limit+' 条 · '+(p.include_content?'正文':'不取正文')+' / '+(p.include_comments?'评论':'不取评论')
+  return ''
+}
+async function loadSchedules(){
+  const el=document.getElementById('scheduleList'); if(!el) return
+  try{
+    const r=await fetch('/api/schedules'); const rules=await r.json()
+    if(!r.ok) throw new Error(rules.error||'读取失败')
+    el.innerHTML=rules.length?rules.map(rule=>{
+      const status=String(rule.last_status||'never')
+      const statusText={never:'从未执行',queued:'已排队',running:'执行中',completed:'已完成',error:'执行失败'}[status]||status
+      const last=rule.last_run_at?String(rule.last_run_at).replace('T',' ').slice(5,16):'从未执行'
+      return `<div class="schedule-item ${rule.enabled?'':'disabled'}"><input type="checkbox" aria-label="启用 ${esc(rule.name)}" ${rule.enabled?'checked':''} onchange="toggleSchedule('${rule.id}',this)"><div><div class="schedule-name">${esc(rule.name)} <span class="bdg gr">${esc(scheduleActionNames[rule.task_type]||rule.task_type)}</span></div><div class="schedule-meta"><span>${weekdayText(rule.weekdays)} ${esc(rule.time)}</span><span class="status-${status}">${statusText}</span><span>上次：${esc(last)}</span></div><div class="schedule-params">${esc(scheduleParamsText(rule))}${rule.last_error?' · '+esc(rule.last_error):''}</div></div><div class="schedule-actions"><button class="btn btn-outline btn-sm" onclick="runSchedule('${rule.id}')">▶ 立即执行</button><button class="btn btn-danger btn-sm" onclick="deleteSchedule('${rule.id}')">删除</button></div></div>`
+    }).join(''):'<div class="empty">暂无定时规则；请在热搜、关键词或账号页面点击“设置定时任务”。</div>'
+  }catch(e){ el.innerHTML='<div class="empty">'+esc(e.message||'读取失败')+'</div>' }
+}
+function openSchedule(formType){
+  const task=collectFormTask(formType)
+  if(!task) return
+  const overlay=document.createElement('div'); overlay.className='qr-overlay'; overlay._task=task
+  overlay.innerHTML=`<div class="qr-modal schedule-modal"><h3>⏰ 设置定时任务 — ${esc(scheduleActionNames[task.type]||task.label)}</h3>
+    <div class="field"><label for="schName">规则名称</label><input id="schName" value="${esc(task.label)} 定时"></div>
+    <div class="field" style="margin-top:12px"><label>执行星期</label><div class="weekday-picker">${['一','二','三','四','五','六','日'].map((x,i)=>'<label><input type="checkbox" class="schDay" value="'+i+'" '+(i<5?'checked':'')+'> '+x+'</label>').join('')}</div></div>
+    <div class="form-grid" style="margin-top:12px"><div class="field"><label for="schTime">执行时间</label><input type="time" id="schTime" value="09:00" required></div></div>
+    <div class="check-row"><label><input type="checkbox" id="schAgent" ${task.params.send_agent?'checked':''}> 执行后发送到 AI Agent</label></div>
+    <div class="param-section"><div class="param-section-title">将保存当前参数</div><div class="schedule-params">${esc(scheduleParamsText({task_type:task.type,params:task.params}))}</div></div>
+    <div class="action-row" style="justify-content:flex-end"><button class="btn btn-outline" onclick="this.closest('.qr-overlay').remove()">取消</button><button class="btn btn-primary" onclick="saveSchedule(this)">添加规则</button></div></div>`
+  document.body.appendChild(overlay); setTimeout(()=>document.getElementById('schName').focus(),30)
+}
+async function saveSchedule(button){
+  const overlay=button.closest('.qr-overlay'); const task=overlay._task
+  const name=(document.getElementById('schName').value||'').trim()
+  const weekdays=Array.from(document.querySelectorAll('.schDay:checked')).map(x=>Number(x.value))
+  const time=document.getElementById('schTime').value
+  if(!name){ msg('请输入规则名称',1); return }
+  if(!weekdays.length){ msg('请至少选择一个星期',1); return }
+  if(!time){ msg('请选择执行时间',1); return }
+  task.params.send_agent=isChecked('schAgent'); button.disabled=true; button.textContent='保存中…'
+  try{
+    const r=await fetch('/api/schedules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,weekdays,time,task_type:task.type,label:task.label,params:task.params})})
+    const d=await r.json(); if(!r.ok) throw new Error(d.error||'添加失败')
+    overlay.remove(); msg('✅ 定时规则已添加')
+    if(document.getElementById('scheduleList')) loadSchedules()
+  }catch(e){ msg(e.message||'添加失败',1); button.disabled=false; button.textContent='添加规则' }
+}
+async function toggleSchedule(id,checkbox){
+  try{ const r=await fetch('/api/schedules/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:checkbox.checked})}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'更新失败'); loadSchedules() }
+  catch(e){ checkbox.checked=!checkbox.checked; msg(e.message||'更新失败',1) }
+}
+async function runSchedule(id){
+  try{ const r=await fetch('/api/schedules/'+id+'/run',{method:'POST'}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'执行失败'); msg('✅ 已加入任务队列'); poll(); loadSchedules() }
+  catch(e){ msg(e.message||'执行失败',1) }
+}
+async function deleteSchedule(id){
+  if(!confirm('确定删除这条定时规则吗？')) return
+  try{ const r=await fetch('/api/schedules/'+id,{method:'DELETE'}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'删除失败'); msg('已删除'); loadSchedules() }
+  catch(e){ msg(e.message||'删除失败',1) }
+}
+// ════════════════════════════════════════════
+// 实例配置
+// ════════════════════════════════════════════
+
+async function refreshInstance(){
+  try{
+    const r = await fetch('/api/instance')
+    const d = await r.json()
+    if(d && !d.error) instance = d
+  }catch(e){}
+}
+
+async function renderCfg(p){
+  await refreshInstance()
+  renderCfgContent(p)
+}
+
+function renderCfgContent(p){
+  const inst = instance || {}
+  const cfg = inst.config || {}
+  const accounts = inst.platform_accounts || []
+  const sb = {running:'<span class="bdg g">🟢 运行中</span>',pending_qr:'<span class="bdg y">🟡 等待扫码</span>',busy:'<span class="bdg y">🟡 正忙</span>',stopped:'<span class="bdg gr">🔴 已停止</span>',flagged:'<span class="bdg r">⛔ 触发风控</span>'}
+  const platNames = {xiaohongshu:'📕 小红书', weibo:'📱 微博', douyin:'🎵 抖音'}
+
+  p.innerHTML = ''+
+    '<div class="card"><h2>⚙️ 实例配置</h2>' +
+
+    // 实例信息
+    '<div class="cfg-section"><h3>🖥️ 实例信息</h3>' +
+    '<div class="cfg-info-grid">' +
+      '<span class="lbl">名称</span><span class="val">'+esc(inst.name||inst.id)+'</span>' +
+      '<span class="lbl">Edge 端口</span><span class="val"><code>'+esc(inst.port)+'</code></span>' +
+      '<span class="lbl">Edge 状态</span><span class="val">'+(sb[inst.status]||'❓')+'</span>' +
+    '</div>' +
+    '<div class="btn-group" style="margin-top:12px">' +
+      (inst.status==='stopped'||inst.status==='flagged'?
+        '<button class="btn btn-sm btn-success" onclick="instStart()">🚀 启动 Edge</button>' :
+        '<button class="btn btn-sm btn-outline" onclick="instStop()">⏹ 停止 Edge</button>') +
+      '<button class="btn btn-sm btn-outline" onclick="instCheck()">🔍 检测登录态</button>' +
+      '<button class="btn btn-sm btn-danger" onclick="instDelete()">🗑 删除实例</button>' +
+    '</div></div>' +
+
+    // Agent 配置
+    '<div class="cfg-section"><h3>🤖 Agent 配置</h3>' +
+    '<label>RPC 地址</label><input id="cfgRpc" value="'+esc(cfg.rpc_url||'')+'" placeholder="http://101.42.14.156:8443/paopao/rpc">' +
+    '<label>Sender ID</label><input id="cfgSender" value="'+esc(cfg.sender_id||'')+'" placeholder="ou_xxx">' +
+    '<label>前缀提示词</label><input id="cfgPrefix" value="'+esc(cfg.prefix_prompt||'')+'" placeholder="可选">' +
+    '<button class="btn btn-primary" onclick="saveCfg()" style="margin-top:12px">💾 保存配置</button></div>' +
+
+    // 密码修改
+    '<div class="cfg-section"><h3>🔑 修改密码</h3>' +
+    '<div class="row"><div><label>旧密码</label><input id="cpOld" type="password"></div></div>' +
+    '<div class="row"><div><label>新密码</label><input id="cpNew" type="password" placeholder="至少4位"></div><div><label>确认新密码</label><input id="cpNew2" type="password"></div></div>' +
+    '<button class="btn btn-outline" onclick="changePwd()">修改密码</button></div>' +
+
+    // 账号管理
+    '<div class="cfg-section"><h3>🔐 账号管理</h3>' +
+    '<div id="acctList">' +
+      (accounts.length
+        ? accounts.map(a => '<div class="acct-row"><div class="acct-info"><span>'+(platNames[a.platform]||a.platform||'')+'</span><span class="bdg '+(a.login_status==='logged_in'?'g':'gr')+'">'+(a.login_status==='logged_in'?'✅ 已登录':'🔴 未登录')+'</span><span style="color:var(--text-muted);font-size:12px">'+esc(a.name||'')+'</span></div><div class="acct-actions">' +
+          '<button class="btn btn-sm btn-success" onclick="acctLogin(\''+a.platform+'\')">📱 扫码登录</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="acctRemove(\''+a.platform+'\')">解绑</button></div></div>')
+        : '<p style="color:var(--text-muted);font-size:13px;padding:8px 0">暂无绑定账号</p>') +
+    '</div>' +
+    '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light)">' +
+    '<div class="row"><div><label>平台</label><select id="apP"><option value="xiaohongshu">📕 小红书</option><option value="weibo">📱 微博</option><option value="douyin">🎵 抖音</option></select></div><div><label>备注名（可选）</label><input id="apN" placeholder="留空则使用平台名称"></div></div>' +
+    '<button class="btn btn-outline" onclick="acctAdd()" style="margin-top:8px">➕ 添加账号</button></div></div>' +
+
+    '</div>'
+}
+
+// ── 刷新并重绘实例配置 ──
+async function refreshAndRender(){
+  await refreshInstance()
+  renderCfgContent(document.getElementById('p_cfg'))
+}
+
+// Instance operations
+async function instStart(){
+  const div = document.createElement('div')
+  div.className = 'qr-overlay'
+  div.innerHTML = '<div class="qr-modal"><h3>🚀 启动 Edge</h3><p style="margin:12px 0;font-size:14px">选择要导航的平台（可选）：</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'+
+    '<button class="btn btn-outline" onclick="instStartGo(\'xiaohongshu\')">📕 小红书</button>'+
+    '<button class="btn btn-outline" onclick="instStartGo(\'weibo\')">📱 微博</button>'+
+    '<button class="btn btn-outline" onclick="instStartGo(\'douyin\')">🎵 抖音</button>'+
+    '<button class="btn btn-outline" onclick="instStartGo(\'\')">🔄 仅启动（不导航）</button>'+
+    '</div><button class="btn btn-outline btn-sm" style="margin-top:12px" onclick="this.closest(\'.qr-overlay\').remove()">取消</button></div>'
+  document.body.appendChild(div)
+}
+async function instStartGo(platform){
+  const overlay = document.querySelector('.qr-overlay')
+  if(overlay && overlay.querySelector('.qr-modal h3').textContent === '🚀 启动 Edge')
+    overlay.remove()
+  const body = platform ? JSON.stringify({platform}) : '{}'
+  const r=await fetch('/api/instance/start',{method:'POST',headers:{'Content-Type':'application/json'},body})
+  const d=await r.json()
+  if(d.ok){
+    if(d.qrcode){
+      const qrdiv = document.createElement('div')
+      qrdiv.className = 'qr-overlay'
+      const platName = {xiaohongshu:'📕 小红书',weibo:'📱 微博',douyin:'🎵 抖音'}[platform]||'已选平台'
+      qrdiv.innerHTML = '<div class="qr-modal"><h3>📱 扫码登录 — '+platName+'</h3><img src="data:image/png;base64,'+d.qrcode+'" alt="登录二维码"><p>请使用 App 扫描二维码完成登录</p><p id="qrmsg" style="color:var(--warning)">等待扫码中…</p><button class="btn btn-outline btn-sm" onclick="clearInterval(this._qt);this.closest(\'.qr-overlay\').remove()">关闭</button></div>'
+      document.body.appendChild(qrdiv)
+      let qa = 0
+      const timer = setInterval(async () => {
+        qa++
+        if(qa > 60){ clearInterval(timer); const qm=document.getElementById('qrmsg'); if(qm)qm.textContent='⏰ 扫码超时'; refreshAndRender(); return }
+        const r2 = await fetch('/api/instance/accounts/'+platform+'/confirm',{method:'POST'})
+        const d2 = await r2.json()
+        if(d2.logged_in){
+          clearInterval(timer)
+          qrdiv.innerHTML = '<div class="qr-modal"><div class="login-success"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div><span>登录成功</span></div></div>'
+          setTimeout(() => qrdiv.remove(), 2000)
+          refreshAndRender()
+        } else if(d2.risk_detected){
+          clearInterval(timer)
+          const qm=document.getElementById('qrmsg'); if(qm)qm.textContent='⚠️ 需要在 Edge 中完成人工验证'
+          showRiskAlert(d2.risk_platform||platform,d2.risk_reason)
+        } else if(qa % 10 === 0){ const qm=document.getElementById('qrmsg'); if(qm)qm.textContent='🔄 仍在等待扫码…' }
+      }, 2000)
+      qrdiv.querySelector('button')._qt = timer
+    } else if(d.logged_in) {
+      msg('✅ 该平台已登录', 0); refreshAndRender()
+    } else if(platform) {
+      msg('❌ 未获取到登录二维码，请查看 Edge 登录页后重试', 1); refreshAndRender()
+    } else {
+      msg('✅ Edge 已启动', 0); refreshAndRender()
+    }
+  } else { msg(d.error||'失败',1) }
+}
+async function instStop(){
+  const r=await fetch('/api/instance/stop',{method:'POST'})
+  const d=await r.json()
+  if(d.ok){ msg('✅ 已停止'); refreshAndRender() }
+  else msg(d.error||'失败',1)
+}
+async function instCheck(){
+  const r=await fetch('/api/instance/check',{method:'POST'})
+  const d=await r.json()
+  if(d.risk_detected){
+    showRiskAlert(d.risk_platform,d.risk_reason)
+    refreshAndRender()
+    return
+  }
+  if(d.platforms && Object.keys(d.platforms).length){
+    const names={xiaohongshu:'小红书',weibo:'微博',douyin:'抖音'}
+    const summary=Object.entries(d.platforms).map(([p,ok])=>(names[p]||p)+(ok?'✅':'❌')).join('  ')
+    msg('登录态：'+summary, !Object.values(d.platforms).some(Boolean))
+  } else if(d.logged_in){
+    msg('✅ 已登录')
+  } else {
+    msg('ℹ️ 未检测到有效登录态'+(d.login_error?' ('+d.login_error+')':''),1)
+  }
+  refreshAndRender()
+}
+async function instDelete(){
+  const pwd = prompt('请输入实例密码以确认删除：')
+  if(!pwd) return
+  if(!confirm('确定删除实例吗？这将清除所有数据包括cookies！')) return
+  const r=await fetch('/api/instance/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pwd})})
+  const d=await r.json()
+  if(d.ok){
+    msg('已删除')
+    doLogout()
+  } else { msg(d.error||'删除失败',1) }
+}
+
+// Agent config
+async function saveCfg(){
+  const d = {
+    rpc_url: document.getElementById('cfgRpc').value.trim(),
+    sender_id: document.getElementById('cfgSender').value.trim(),
+    prefix_prompt: document.getElementById('cfgPrefix').value.trim(),
+  }
+  const r = await fetch('/api/instance/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)})
+  const j = await r.json()
+  if(j.ok){ msg('✅ 已保存') } else { msg('保存失败',1) }
+}
+
+// Password change
+async function changePwd(){
+  const old = document.getElementById('cpOld').value
+  const pwd = document.getElementById('cpNew').value
+  const pwd2 = document.getElementById('cpNew2').value
+  if(!old){ msg('请输入旧密码',1); return }
+  if(pwd !== pwd2){ msg('两次新密码不一致',1); return }
+  if(pwd.length < 4){ msg('新密码至少4位',1); return }
+  const r = await fetch('/api/instance/password',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_password:old,new_password:pwd})})
+  const d = await r.json()
+  if(d.ok){ msg('✅ 密码已修改'); document.getElementById('cpOld').value=''; document.getElementById('cpNew').value=''; document.getElementById('cpNew2').value='' }
+  else msg(d.error||'修改失败',1)
+}
+
+// Account management
+async function acctAdd(){
+  const plat = document.getElementById('apP').value
+  const name = document.getElementById('apN').value.trim()
+
+  const r = await fetch('/api/instance/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({platform:plat,name})})
+  const d = await r.json()
+  if(d.ok){ msg('✅ 已添加'); document.getElementById('apN').value=''; refreshAndRender() }
+  else msg(d.error||'添加失败',1)
+}
+async function acctRemove(platform){
+  if(!confirm('确定解绑 '+platform+' 账号吗？')) return
+  const r = await fetch('/api/instance/accounts/'+platform,{method:'DELETE'})
+  const d = await r.json()
+  if(d.ok){ msg('✅ 已解绑'); refreshAndRender() }
+  else msg(d.error||'解绑失败',1)
+}
+async function acctLogin(platform){
+  const loading = document.createElement('div')
+  loading.className = 'qr-overlay'
+  loading.innerHTML = '<div class="qr-modal"><h3>正在打开登录页</h3><p>正在启动 Edge 并加载二维码，请稍候…</p></div>'
+  document.body.appendChild(loading)
+  const r = await fetch('/api/instance/accounts/'+platform+'/login',{method:'POST'})
+  const d = await r.json()
+  loading.remove()
+  if(d.ok){
+    if(d.qrcode){
+      const qrdiv = document.createElement('div')
+      qrdiv.className = 'qr-overlay'
+      const platName = {xiaohongshu:'📕 小红书',weibo:'📱 微博',douyin:'🎵 抖音'}[platform]||platform
+      qrdiv.innerHTML = '<div class="qr-modal"><h3>📱 扫码登录 — '+platName+'</h3><img src="data:image/png;base64,'+d.qrcode+'" alt="登录二维码"><p>请使用 App 扫描二维码完成登录</p><p id="qrmsg" style="color:var(--warning)">等待扫码中…</p><button class="btn btn-outline btn-sm" onclick="clearInterval(this._qt);this.closest(\'.qr-overlay\').remove()">关闭</button></div>'
+      document.body.appendChild(qrdiv)
+      let qa = 0
+      const timer = setInterval(async () => {
+        qa++
+        if(qa > 60){ clearInterval(timer); const qm=document.getElementById('qrmsg'); if(qm)qm.textContent='⏰ 扫码超时'; refreshAndRender(); return }
+        const r2 = await fetch('/api/instance/accounts/'+platform+'/confirm',{method:'POST'})
+        const d2 = await r2.json()
+        if(d2.logged_in){
+          clearInterval(timer)
+          qrdiv.innerHTML = '<div class="qr-modal"><div class="login-success"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div><span>登录成功</span></div></div>'
+          setTimeout(() => qrdiv.remove(), 2000)
+          refreshAndRender()
+        } else if(d2.risk_detected){
+          clearInterval(timer)
+          const qm=document.getElementById('qrmsg'); if(qm)qm.textContent='⚠️ 需要在 Edge 中完成人工验证'
+          showRiskAlert(d2.risk_platform||platform,d2.risk_reason)
+        } else if(qa % 10 === 0){ const qm=document.getElementById('qrmsg'); if(qm)qm.textContent='🔄 仍在等待扫码…' }
+      }, 2000)
+      qrdiv.querySelector('button')._qt = timer
+    } else if(d.logged_in) {
+      msg('✅ 该平台已登录', 0); refreshAndRender()
+    } else {
+      msg('❌ 未获取到登录二维码，请查看 Edge 登录页后重试', 1); refreshAndRender()
+    }
+  } else { msg(d.error||'登录失败',1) }
+}
+
+// ════════════════════════════════════════════
+// 启动
+// ════════════════════════════════════════════
+init()
+</script>
+</body>
+</html>
